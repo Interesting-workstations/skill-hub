@@ -26,28 +26,3 @@ export function cardHoverLeave(element: Element | string) {
     ease: EASE.out,
   });
 }
-
-/**
- * 卡片列表 stagger 入场
- */
-export function cardListEnter(container: Element | string) {
-  const cards = (
-    typeof container === "string"
-      ? document.querySelector(container)
-      : container
-  )?.querySelectorAll(".skill-card, .author-card");
-
-  if (!cards || cards.length === 0) return null;
-
-  return gsap.fromTo(
-    cards,
-    { opacity: 0, y: getDistance(16) },
-    {
-      opacity: 1,
-      y: 0,
-      duration: getDuration(DURATION.medium),
-      stagger: getDuration(0.05),
-      ease: EASE.smooth,
-    }
-  );
-}

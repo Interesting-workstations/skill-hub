@@ -1,5 +1,3 @@
-import gsap from "gsap";
-
 /** 检测用户是否开启了减少动画偏好 */
 export function prefersReducedMotion(): boolean {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;

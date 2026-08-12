@@ -43,24 +43,10 @@ export function pageEnter(container: Element | string) {
 }
 
 /**
- * 页面退出动画
- */
-export function pageLeave(container: Element | string) {
-  const dur = getDuration(DURATION.normal);
-
-  return gsap.to(container, {
-    opacity: 0,
-    y: getDistance(-8),
-    duration: dur,
-    ease: EASE.in,
-  });
-}
-
-/**
  * Section 进入动画：带有 stagger 的元素列表
  */
 export function sectionEnter(
-  elements: Element[] | string,
+  elements: NodeListOf<Element> | Element[] | string,
   options?: { staggerAmount?: number; fromY?: number }
 ) {
   const dur = getDuration(DURATION.medium);
@@ -76,22 +62,6 @@ export function sectionEnter(
       duration: dur,
       stagger,
       ease: EASE.smooth,
-    }
-  );
-}
-
-/**
- * 面包屑入场
- */
-export function breadcrumbEnter(element: Element | string) {
-  return gsap.fromTo(
-    element,
-    { opacity: 0, y: getDistance(-4) },
-    {
-      opacity: 1,
-      y: 0,
-      duration: getDuration(DURATION.normal),
-      ease: EASE.out,
     }
   );
 }
