@@ -51,6 +51,46 @@
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 16px;
+  /* 首页预览：最多显示两行（移动端 2 个 / 桌面 4 个），超出折叠 */
+  overflow: hidden;
+  position: relative;
+}
+.skill-section-grid > :nth-child(n + 3) {
+  display: none;
+}
+@media (min-width: 641px) {
+  .skill-section-grid > :nth-child(n + 3) {
+    display: revert;
+  }
+  .skill-section-grid > :nth-child(n + 5) {
+    display: none;
+  }
+}
+
+/* 查看更多 */
+.skill-section-more {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+}
+.skill-more-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 22px;
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  text-decoration: none;
+  transition: border-color 0.2s, color 0.2s, box-shadow 0.2s;
+}
+.skill-more-btn:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  box-shadow: 0 2px 12px rgba(124, 58, 237, 0.08);
 }
 
 @media (max-width: 640px) {
