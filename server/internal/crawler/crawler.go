@@ -1,0 +1,169 @@
+package crawler
+
+import (
+	"fmt"
+	"sort"
+	"strings"
+)
+
+// CrawlOptions 爬取选项。
+type CrawlOptions struct {
+	// Query 搜索关键词（可多次指定不同关键词，内部去重）。
+	Query string
+	// Limit 最多处理的仓库数量。
+	Limit int
+	// PerPage 每次搜索返回的仓库数。
+	PerPage int
+}
+
+// DefaultOptions 返回默认爬取选项。
+func DefaultOptions() CrawlOptions {
+	return CrawlOptions{Query: "agent skills", Limit: 20, PerPage: 10}
+}
+
+// Crawl 执行爬取：搜索仓库 → 识别并解析 skill → 返回去重后的技能列表。
+func (c *Client) Crawl(opts CrawlOptions) ([]Skill, error) {
+	repos, err := c.SearchRepos(opts.Query, opts.PerPage, 1)
+	if err != nil {
+		return nil, fmt.Errorf("搜索仓库失败: %w", err)
+	}
+	if len(repos) > opts.Limit {
+		repos = repos[:opts.Limit]
+	}
+
+	seen := make(map[string]bool)
+	var skills []Skill
+	for _, repo := range repos {
+		got, err := c.crawlRepo(repo)
+		if err != nil {
+			fmt.Printf("  ⚠️ 跳过 %s: %v\n", repo.FullName, err)
+			continue
+		}
+		for _, s := range got {
+			if seen[s.ID] {
+				continue
+			}
+			seen[s.ID] = true
+			skills = append(skills, s)
+		}
+	}
+
+	sort.Slice(skills, func(i, j int) bool { return skills[i].Name < skills[j].Name })
+	return skills, nil
+}
+
+// crawlRepo 解析单个仓库中的 skill。
+// 识别规则：
+//  1. 仓库根目录存在 SKILL.md → 整个仓库是一个 skill
+//  2. 存在 skills/ 目录 → 其下每个含 SKILL.md 的子目录是一个 skill
+func (c *Client) crawlRepo(repo Repo) ([]Skill, error) {
+	entries, err := c.ListContents(repo.FullName, "", repo.DefaultBranch)
+	if err != nil {
+		return nil, err
+	}
+
+	var skills []Skill
+	for _, e := range entries {
+		switch {
+		case e.Type == "file" && strings.EqualFold(e.Name, "SKILL.md"):
+			s, err := c.buildSkill(repo, "", e.Path)
+			if err == nil {
+				skills = append(skills, s)
+			}
+		case e.Type == "dir" && (strings.EqualFold(e.Name, "skills") || strings.EqualFold(e.Name, "skillsets")):
+			sub, err := c.ListContents(repo.FullName, e.Path, repo.DefaultBranch)
+			if err != nil {
+				continue
+			}
+			for _, subEntry := range sub {
+				if subEntry.Type != "dir" {
+					continue
+				}
+				s, err := c.buildSkill(repo, subEntry.Name, subEntry.Path+"/SKILL.md")
+				if err == nil {
+					skills = append(skills, s)
+				}
+			}
+		}
+	}
+	return skills, nil
+}
+
+// buildSkill 读取 SKILL.md 并组装 Skill 记录。
+func (c *Client) buildSkill(repo Repo, skillName, mdPath string) (Skill, error) {
+	content, err := c.GetFile(repo.FullName, mdPath, repo.DefaultBranch)
+	if err != nil {
+		return Skill{}, err
+	}
+	name, desc := ParseSkillMD(content)
+	if name == "" {
+		name = skillName
+	}
+	if name == "" {
+		name = repo.FullName
+	}
+
+	id := slugify(repo.FullName)
+	if skillName != "" {
+		id = slugify(repo.FullName) + "-" + slugify(skillName)
+	}
+
+	license := ""
+	if repo.License != nil {
+		license = repo.License.SPDXID
+		if license == "" {
+			license = repo.License.Name
+		}
+	}
+
+	return Skill{
+		ID:          id,
+		Name:        name,
+		Author:      strings.Split(repo.FullName, "/")[0],
+		Description: desc,
+		Tags:        inferTags(name, desc),
+		Category:    "development",
+		DownloadURL: repo.HTMLURL + "/archive/refs/heads/" + repo.DefaultBranch + ".zip",
+		GithubURL:   repo.HTMLURL,
+		GithubStars: formatStars(repo.Stars),
+		License:     license,
+	}, nil
+}
+
+// formatStars 将 star 数格式化为可读字符串（如 239、1.2k、3.4k）。
+func formatStars(n int) string {
+	if n >= 1000 {
+		return fmt.Sprintf("%.1fk", float64(n)/1000)
+	}
+	return fmt.Sprintf("%d", n)
+}
+
+// inferTags 从名称与描述推断标签（简单关键词匹配）。
+func inferTags(name, desc string) []string {
+	text := strings.ToLower(name + " " + desc)
+	tags := make([]string, 0)
+	for _, kw := range []string{
+		"development", "testing", "document", "browser-automation",
+		"database", "creative", "media", "productivity", "security",
+		"web-scraping", "code-review", "research", "accessibility",
+		"payment", "audio", "api",
+	} {
+		if strings.Contains(text, kw) {
+			tags = append(tags, kw)
+		}
+	}
+	return tags
+}
+
+// slugify 转小写并将非字母数字字符替换为 -。
+func slugify(s string) string {
+	var b strings.Builder
+	for _, r := range strings.ToLower(s) {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+		} else {
+			b.WriteByte('-')
+		}
+	}
+	return strings.Trim(b.String(), "-")
+}

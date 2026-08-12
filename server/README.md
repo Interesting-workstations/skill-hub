@@ -16,6 +16,37 @@ go run ./cmd/server          # 默认监听 :8080
 SERVER_ADDR=:9090 DATA_PATH=data/skills.json go run ./cmd/server
 ```
 
+## 🕷️ 技能爬虫（cmd/crawler）
+
+从 GitHub 自动爬取公开的 Agent Skill，输出与数据模型兼容的 JSON。
+
+```bash
+# 使用 GitHub Token 可显著提升 API 速率限制
+export GITHUB_TOKEN=ghp_xxx
+
+go run ./cmd/crawler -query "claude skills" -limit 50 -output data/crawled-skills.json
+```
+
+| 参数 | 默认值 | 说明 |
+|---|---|---|
+| `-query` | `agent skills` | GitHub 搜索关键词（如 `claude skills`、`codex skills`） |
+| `-limit` | `20` | 最多处理的仓库数量 |
+| `-per-page` | `10` | 每次搜索请求返回的仓库数（最大 100） |
+| `-output` | stdout | 输出 JSON 文件路径 |
+
+**skill 识别规则**：
+
+1. 仓库根目录存在 `SKILL.md` → 整个仓库作为一个技能
+2. 存在 `skills/`（或 `skillsets/`）目录 → 其下每个含 `SKILL.md` 的子目录为一个技能
+
+**提取字段**：名称（SKILL.md frontmatter 或目录名）、描述、作者、标签、下载链接（zip）、GitHub 地址、stars、License。
+
+```bash
+# 示例：爬取结果合并入种子数据后重新运行服务
+go run ./cmd/crawler -query "claude skills" -limit 50 -output data/crawled-skills.json
+go run ./cmd/server
+```
+
 ## 测试
 
 ```bash
