@@ -8,10 +8,16 @@ import (
 	"os"
 	"strings"
 
+	"github.com/Interesting-workstations/skill-hub/server/internal/config"
 	"github.com/Interesting-workstations/skill-hub/server/internal/crawler"
 )
 
 func main() {
+	// 加载 .env（GITHUB_TOKEN 等）
+	if err := config.LoadEnv(".env"); err != nil {
+		log.Printf("⚠️ 加载 .env 失败: %v", err)
+	}
+
 	query := flag.String("query", "agent skills", "GitHub 搜索关键词（如 \"claude skills\"、\"codex skills\"）")
 	limit := flag.Int("limit", 20, "最多处理的仓库数量")
 	perPage := flag.Int("per-page", 10, "每次搜索 API 请求返回的仓库数（最大 100）")

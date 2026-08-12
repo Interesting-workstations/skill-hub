@@ -219,6 +219,17 @@ func (s *Service) executeTask(taskID, taskName, query, execID string) {
 	stats.Fetched = len(skills)
 	stats.Failed = len(failures)
 
+	// 区分官方 / 社区（个人）来源
+	officialN, communityN := 0, 0
+	for _, sk := range skills {
+		if sk.IsOfficial {
+			officialN++
+		} else {
+			communityN++
+		}
+	}
+	appendLog("info", fmt.Sprintf("本次抓取：官方 %d 个，社区/个人 %d 个", officialN, communityN))
+
 	var insert []InsertSkill
 	for _, sk := range skills {
 		exists, _ := s.repo.SkillExists(sk.ID)

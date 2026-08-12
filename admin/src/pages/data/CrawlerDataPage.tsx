@@ -14,6 +14,7 @@ export default function CrawlerDataPage() {
   const [data, setData] = useState<CrawledDataItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<DataStatus | "">("");
+  const [source, setSource] = useState<"all" | "official" | "community">("all");
   const [keyword, setKeyword] = useState("");
 
   const load = async () => {
@@ -27,9 +28,12 @@ export default function CrawlerDataPage() {
     void load();
   }, [filter]);
 
-  const filtered = keyword
-    ? data.filter((d) => d.name.toLowerCase().includes(keyword.toLowerCase()))
-    : data;
+  const filtered = data.filter((d) => {
+    if (keyword && !d.name.toLowerCase().includes(keyword.toLowerCase())) return false;
+    if (source === "official" && !d.isOfficial) return false;
+    if (source === "community" && d.isOfficial) return false;
+    return true;
+  });
 
   const columns: Column<CrawledDataItem>[] = [
     {
@@ -39,7 +43,11 @@ export default function CrawlerDataPage() {
         <div>
           <div style={{ fontWeight: 500 }}>
             {d.name}
-            {d.isOfficial && <span className="badge badge-neutral" style={{ marginLeft: 6 }}>官方</span>}
+            {d.isOfficial ? (
+              <span className="badge badge-neutral" style={{ marginLeft: 6 }}>官方</span>
+            ) : (
+              <span className="badge badge-neutral" style={{ marginLeft: 6, color: "var(--color-text-tertiary)" }}>社区/个人</span>
+            )}
           </div>
           <div style={{ fontSize: 12, color: "var(--color-text-tertiary)" }}>{d.source}</div>
         </div>
@@ -113,6 +121,11 @@ export default function CrawlerDataPage() {
               onChange={(e) => setKeyword(e.target.value)}
               style={{ width: 200 }}
             />
+            <select className="select" value={source} onChange={(e) => setSource(e.target.value as "all" | "official" | "community")}>
+              <option value="all">全部来源</option>
+              <option value="official">官方</option>
+              <option value="community">社区/个人</option>
+            </select>
             <select className="select" value={filter} onChange={(e) => setFilter(e.target.value as DataStatus | "")}>
               <option value="">全部状态</option>
               <option value="pending">待审核</option>

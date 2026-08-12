@@ -22,20 +22,26 @@ docker run -d --name skillhub-mysql \
 ### 2. 启动服务
 
 ```bash
-go run ./cmd/server          # 默认监听 :8080
-# 或指定端口与数据库连接
+# 复制 .env.example 为 .env，填入 GITHUB_TOKEN 等配置
+cp .env.example .env
+# 编辑 .env 后直接启动（.env 自动加载）
+go run ./cmd/server
+# 或覆盖环境变量
 SERVER_ADDR=:9090 MYSQL_DSN='root:root@tcp(127.0.0.1:3306)/skillhub?charset=utf8mb4&parseTime=true' go run ./cmd/server
 ```
 
-首次启动时若数据库为空，会自动创建数据表（`categories` / `authors` / `skills`）并从 `data/skills.json` 填充种子数据。
+首次启动时若数据库为空，会自动创建数据表（`categories` / `authors` / `skills` / 后台表）并从 `data/skills.json` 填充种子数据。
 
-### 环境变量
+### 环境变量（支持 .env 文件，`cp .env.example .env`）
 
 | 变量 | 默认值 | 说明 |
 |---|---|---|
 | `SERVER_ADDR` | `:8080` | HTTP 监听地址 |
 | `MYSQL_DSN` | `root:root@tcp(127.0.0.1:3306)/skillhub?charset=utf8mb4&parseTime=true` | MySQL 连接串 |
 | `SEED_PATH` | `data/skills.json` | 种子数据 JSON 路径 |
+| `GITHUB_TOKEN` | 空 | GitHub Token（爬虫必需；在 https://github.com/settings/tokens 生成，`repo` 权限） |
+
+> `.env` 不提交到 git（已在 `.gitignore` 中）。`cmd/crawler` 与 `cmd/import` 同样加载 `.env`。
 
 ### 精选技能规则
 
@@ -53,8 +59,8 @@ SERVER_ADDR=:9090 MYSQL_DSN='root:root@tcp(127.0.0.1:3306)/skillhub?charset=utf8
 从 GitHub 自动爬取公开的 Agent Skill，输出与数据模型兼容的 JSON。
 
 ```bash
-# 使用 GitHub Token 可显著提升 API 速率限制
-export GITHUB_TOKEN=ghp_xxx
+# Token 从 .env 加载（也可环境变量覆盖）
+cp .env.example .env   # 填写 GITHUB_TOKEN
 
 go run ./cmd/crawler -query "claude skills" -limit 50 -output data/crawled-skills.json
 ```
@@ -71,9 +77,11 @@ go run ./cmd/crawler -query "claude skills" -limit 50 -output data/crawled-skill
 1. 仓库根目录存在 `SKILL.md` → 整个仓库作为一个技能
 2. 存在 `skills/`（或 `skillsets/`）目录 → 其下每个含 `SKILL.md` 的子目录为一个技能
 
-**官方与分类识别**：
+**官方与社区（个人）识别**：
 
-- **官方技能**：来自官方组织仓库（anthropics、openai、microsoft、vercel、google、github、cloudflare、figma、notion、stripe、aws 等）的技能自动标记 `isOfficial=true`，并在首页「官方技能」区块展示；
+- **官方技能**：仓库 owner 在官方组织列表（anthropics、openai、microsoft、vercel、google、github、cloudflare、figma、notion、stripe、aws、meta、huggingface、ibm 等 30+）内 → `isOfficial=true`；
+- **社区/个人技能**：其余仓库 owner → `isOfficial=false`，数据管理中标记「社区/个人」；
+- 后台执行任务时**官方仓库与搜索结果的社区仓库都会爬取**，并在执行日志统计「官方 X 个，社区/个人 Y 个」；
 - **分类推断**：根据技能名称与描述关键词自动归类（browser-automation、database、document、media、creative、productivity、testing、security、development 等）。
 
 **提取字段**：名称（SKILL.md frontmatter 或目录名）、描述、作者、标签、分类、官方标记、下载链接（zip）、GitHub 地址、stars、License。

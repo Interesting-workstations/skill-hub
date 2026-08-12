@@ -18,12 +18,18 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/Interesting-workstations/skill-hub/server/internal/config"
 	"github.com/Interesting-workstations/skill-hub/server/internal/crawler"
 	"github.com/Interesting-workstations/skill-hub/server/internal/domain"
 	"github.com/Interesting-workstations/skill-hub/server/internal/skill"
 )
 
 func main() {
+	// 加载 .env（MYSQL_DSN 等）
+	if err := config.LoadEnv(".env"); err != nil {
+		log.Printf("⚠️ 加载 .env 失败: %v", err)
+	}
+
 	input := flag.String("input", "", "爬虫输出 JSON 文件路径（必填）")
 	dsn := flag.String("dsn",
 		"root:root@tcp(127.0.0.1:3306)/skillhub?charset=utf8mb4&parseTime=true",

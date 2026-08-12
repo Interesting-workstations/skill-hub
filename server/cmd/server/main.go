@@ -12,11 +12,17 @@ import (
 	"time"
 
 	"github.com/Interesting-workstations/skill-hub/server/internal/admin"
+	"github.com/Interesting-workstations/skill-hub/server/internal/config"
 	"github.com/Interesting-workstations/skill-hub/server/internal/router"
 	"github.com/Interesting-workstations/skill-hub/server/internal/skill"
 )
 
 func main() {
+	// 加载 .env（GITHUB_TOKEN / MYSQL_DSN 等），不覆盖已存在的环境变量
+	if err := config.LoadEnv(".env"); err != nil {
+		log.Printf("⚠️ 加载 .env 失败: %v", err)
+	}
+
 	addr := getenv("SERVER_ADDR", ":8080")
 	dsn := getenv("MYSQL_DSN",
 		"root:root@tcp(127.0.0.1:3306)/skillhub?charset=utf8mb4&parseTime=true")

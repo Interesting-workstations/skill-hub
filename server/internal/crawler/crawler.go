@@ -172,6 +172,7 @@ func (c *Client) buildSkill(repo Repo, skillName, mdPath string) (Skill, error) 
 }
 
 // officialOrgs 官方组织及其在站点上展示的头像 emoji。
+// 爬取到的仓库 owner 在此列表内 → 官方技能；否则 → 个人/社区技能。
 var officialOrgs = map[string]string{
 	"anthropics":          "🅰️",
 	"openai":              "🤖",
@@ -179,6 +180,7 @@ var officialOrgs = map[string]string{
 	"vercel":              "▲",
 	"google":              "🇬",
 	"googlecloudplatform": "🇬",
+	"deepmind":            "🇬",
 	"github":              "🐙",
 	"cloudflare":          "☁️",
 	"figma":               "🎨",
@@ -187,6 +189,24 @@ var officialOrgs = map[string]string{
 	"aws":                 "☁️",
 	"aws-samples":         "☁️",
 	"sst":                 "▲",
+	"meta":                "🔵",
+	"facebook":            "🔵",
+	"huggingface":         "🤗",
+	"ibm":                 "🔷",
+	"oracle":              "🟠",
+	"apple":               "🍎",
+	"netflix":             "🎬",
+	"linkedin":            "💼",
+	"amazon":              "🛒",
+	"alibaba":             "🅰️",
+	"tencent":             "🐧",
+	"baidu":               "🐻",
+	"xai":                 "🐦",
+	"mistralai":           "🌀",
+	"cohere":              "🌊",
+	"databricks":          "🔥",
+	"snowflake":           "❄️",
+	"anthropic":           "🅰️",
 }
 
 // IsOfficialOrg 判断仓库 owner 是否为官方组织。
