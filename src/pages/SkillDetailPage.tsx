@@ -9,7 +9,7 @@ export default function SkillDetailPage() {
   const allSkills = getAllSkills();
   const skill = allSkills.find((s) => s.id === skillId);
 
-  usePageEnter();
+  usePageEnter(`detail-${skillId || "unknown"}`);
   const downloadBtnRef = useButtonMicro();
   const githubBtnRef = useButtonMicro();
   const { ref: copyBtnRef, flash: flashCopy } = useCopyFeedback();

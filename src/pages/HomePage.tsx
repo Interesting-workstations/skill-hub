@@ -6,7 +6,7 @@ import SkillSection from "../components/SkillSection";
 import { authors, featuredSkills, skillCategories } from "../data/skills";
 
 export default function HomePage() {
-  usePageEnter();
+  usePageEnter("home");
 
   return (
     <>
