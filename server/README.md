@@ -4,17 +4,49 @@ Agent Skills 资源库后端服务（Go），采用**模块化单体（Modular M
 
 ## 技术栈
 
-- Go 1.23+（标准库 `net/http`，零第三方依赖）
-- 内存 Repository + JSON 种子数据（`data/skills.json`）
+- Go 1.23+（标准库 `net/http`）
+- MySQL 8.0（`github.com/go-sql-driver/mysql`，首次启动自动建库建表，并从 `data/skills.json` 种子数据初始化）
 - 统一响应格式 `{ code, message, data }`
 
 ## 快速开始
 
+### 1. 启动 MySQL（Docker）
+
+```bash
+docker run -d --name skillhub-mysql \
+  -e MYSQL_ROOT_PASSWORD=root \
+  -e MYSQL_DATABASE=skillhub \
+  -p 3306:3306 mysql:8.0
+```
+
+### 2. 启动服务
+
 ```bash
 go run ./cmd/server          # 默认监听 :8080
-# 或指定端口与数据源
-SERVER_ADDR=:9090 DATA_PATH=data/skills.json go run ./cmd/server
+# 或指定端口与数据库连接
+SERVER_ADDR=:9090 MYSQL_DSN='root:root@tcp(127.0.0.1:3306)/skillhub?charset=utf8mb4&parseTime=true' go run ./cmd/server
 ```
+
+首次启动时若数据库为空，会自动创建数据表（`categories` / `authors` / `skills`）并从 `data/skills.json` 填充种子数据。
+
+### 环境变量
+
+| 变量 | 默认值 | 说明 |
+|---|---|---|
+| `SERVER_ADDR` | `:8080` | HTTP 监听地址 |
+| `MYSQL_DSN` | `root:root@tcp(127.0.0.1:3306)/skillhub?charset=utf8mb4&parseTime=true` | MySQL 连接串 |
+| `SEED_PATH` | `data/skills.json` | 种子数据 JSON 路径 |
+
+### 精选技能规则
+
+首页「精选技能」由规则算法生成（`GET /api/v1/skills?featured=true`）：
+
+1. **官方技能优先**：官方出品排在非官方之前；
+2. **GitHub 星标降序**：同一优先级下按星标数排序（支持 `861`、`168.1k`、`1.2m` 等格式）；
+3. **分类多样性**：每个分类最多入选 2 个，避免首页被单一分类刷屏；
+4. 默认共 6 个（`DefaultFeaturedLimit`）。
+
+分类数量与站点统计（`GET /api/v1/stats`）均实时从数据库聚合计算，保证真实准确。
 
 ## 🕷️ 技能爬虫（cmd/crawler）
 

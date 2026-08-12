@@ -17,12 +17,14 @@ import (
 
 func main() {
 	addr := getenv("SERVER_ADDR", ":8080")
-	dataPath := getenv("DATA_PATH", "data/skills.json")
+	dsn := getenv("MYSQL_DSN",
+		"root:root@tcp(127.0.0.1:3306)/skillhub?charset=utf8mb4&parseTime=true")
+	seedPath := getenv("SEED_PATH", "data/skills.json")
 
-	// 数据层（内存 Repository，从 JSON 种子加载）
-	repo, err := skill.NewMemoryRepository(dataPath)
+	// 数据层（MySQL Repository，首次启动自动建库并从种子 JSON 初始化）
+	repo, err := skill.NewMySQLRepository(dsn, seedPath)
 	if err != nil {
-		log.Fatalf("加载种子数据失败: %v", err)
+		log.Fatalf("初始化数据库失败: %v", err)
 	}
 	svc := skill.NewService(repo)
 
@@ -34,7 +36,7 @@ func main() {
 	}
 
 	go func() {
-		log.Printf("Agent Skills API 已启动，监听 %s（数据源 %s）", addr, dataPath)
+		log.Printf("Agent Skills API 已启动，监听 %s（数据库 MySQL）", addr)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("服务启动失败: %v", err)
 		}
