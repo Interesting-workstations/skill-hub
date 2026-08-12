@@ -1,9 +1,13 @@
+import { Link } from "react-router-dom";
+import { useButtonMicro } from "../animations";
 import "./SkillCard.css";
 import type { Skill } from "../data/skills";
 
 export default function SkillCard({ skill }: { skill: Skill }) {
+  const btnRef = useButtonMicro();
+
   return (
-    <a href={`/skill/${skill.id}`} className="skill-card">
+    <Link to={`/skill/${skill.id}`} className="skill-card" data-animate="card">
       <div className="skill-card-top">
         <div className="skill-card-icon">
           {skill.isOfficial ? "⭐" : "📦"}
@@ -13,6 +17,7 @@ export default function SkillCard({ skill }: { skill: Skill }) {
           <span className="skill-card-author">{skill.author}</span>
         </div>
         <button
+          ref={btnRef}
           className="skill-card-download"
           onClick={(e) => {
             e.preventDefault();
@@ -39,6 +44,6 @@ export default function SkillCard({ skill }: { skill: Skill }) {
           </span>
         ))}
       </div>
-    </a>
+    </Link>
   );
 }

@@ -1,3 +1,8 @@
+export interface SkillSection {
+  heading: string;
+  body: string[];
+}
+
 export interface Skill {
   id: string;
   name: string;
@@ -9,6 +14,11 @@ export interface Skill {
   downloadUrl: string;
   isOfficial?: boolean;
   isFeatured?: boolean;
+  installCommand?: string;
+  githubUrl?: string;
+  githubStars?: string;
+  license?: string;
+  content?: SkillSection[];
 }
 
 export interface Author {
@@ -23,6 +33,11 @@ export interface SkillCategory {
   slug: string;
   count: number;
   skills: Skill[];
+}
+
+/** Get all skills as a flat list for detail page lookup */
+export function getAllSkills(): Skill[] {
+  return [...featuredSkills, ...skillCategories.flatMap((c) => c.skills)];
 }
 
 export const authors: Author[] = [
@@ -49,6 +64,42 @@ export const featuredSkills: Skill[] = [
     downloadUrl: "#",
     isOfficial: true,
     isFeatured: true,
+    installCommand:
+      "npx skills add https://github.com/anthropics/skills --skill frontend-design",
+    githubUrl: "https://github.com/anthropics/skills",
+    githubStars: "168.1k",
+    license: "完整条款见 LICENSE.txt",
+    content: [
+      {
+        heading: "Frontend Design",
+        body: [
+          "Approach this as the design lead at a small studio known for giving every client a visual identity that could not be mistaken for anyone else's. This client has already rejected proposals that felt templated, and is paying for a distinctive point of view: make deliberate, opinionated choices about palette, typography, and layout that are specific to this brief, and take one real aesthetic risk you can justify.",
+        ],
+      },
+      {
+        heading: "Ground it in the subject",
+        body: [
+          "If the brief does not pin down what the product or subject is, pin it yourself before designing: name one concrete subject, its audience, and the page's single job, and state your choice. The subject's own world, its materials, instruments, artifacts, and vernacular, is where distinctive choices come from.",
+        ],
+      },
+      {
+        heading: "Design principles",
+        body: [
+          "For web designs, the hero is a thesis. Open with the most characteristic thing in the subject's world, in whatever form makes sense for it: a headline, an image, an animation, a live demo, an interactive moment.",
+          "Typography carries the personality of the page. Pair the display and body faces deliberately, not the same families you would reach for on any other project, and set a clear type scale with intentional weights, widths, and spacing.",
+          "Structure is information. Structural devices, numbering, eyebrows, dividers, labels, should encode something true about the content, not decorate it.",
+          "Leverage motion deliberately. Think about where and if animation can serve the subject: a page-load sequence, a scroll-triggered reveal, hover micro-interactions, ambient atmosphere.",
+          "Match complexity to the vision. Maximalist directions need elaborate execution; minimal directions need precision in spacing, type, and detail.",
+        ],
+      },
+      {
+        heading: "Restraint and self-critique",
+        body: [
+          "Spend your boldness in one place. Let the signature element be the one memorable thing, keep everything around it quiet and disciplined, and cut any decoration that does not serve the brief.",
+          "Build to a quality floor without announcing it: responsive down to mobile, visible keyboard focus, reduced motion respected. Critique your own work as you build.",
+        ],
+      },
+    ],
   },
   {
     id: "notebooklm-skill",
@@ -59,6 +110,26 @@ export const featuredSkills: Skill[] = [
     category: "featured",
     downloadUrl: "#",
     isFeatured: true,
+    installCommand: "npx skills add https://github.com/pleaseprompto/skills --skill notebooklm-skill",
+    githubUrl: "https://github.com/pleaseprompto/skills",
+    githubStars: "2.3k",
+    content: [
+      {
+        heading: "使用方法",
+        body: [
+          "让 Claude Code 直接与 NotebookLM 对话，仅基于你上传的文档提供有据可查的答案。无需离开你的开发环境，即可获取基于文档的智能分析。",
+        ],
+      },
+      {
+        heading: "功能特性",
+        body: [
+          "自动连接到你的 NotebookLM 实例，读取已上传的文档内容。",
+          "基于文档内容提供准确、有据可查的回答，避免幻觉。",
+          "支持多文档交叉查询，快速定位关键信息。",
+          "保持对话上下文，支持连续追问和深入探讨。",
+        ],
+      },
+    ],
   },
   {
     id: "webapp-testing",
@@ -70,6 +141,27 @@ export const featuredSkills: Skill[] = [
     downloadUrl: "#",
     isOfficial: true,
     isFeatured: true,
+    installCommand: "npx skills add https://github.com/microsoft/skills --skill webapp-testing",
+    githubUrl: "https://github.com/microsoft/skills",
+    githubStars: "861",
+    content: [
+      {
+        heading: "概述",
+        body: [
+          "使用 Playwright 与本地 Web 应用交互和测试的工具包。支持验证前端功能、调试 UI 行为、捕获浏览器截图以及查看浏览器日志。",
+        ],
+      },
+      {
+        heading: "核心能力",
+        body: [
+          "自动化浏览器操作：点击、输入、导航、截图",
+          "端到端测试脚本生成和执行",
+          "跨浏览器兼容性测试（Chromium、Firefox、WebKit）",
+          "浏览器控制台日志捕获与分析",
+          "网络请求拦截与 Mock",
+        ],
+      },
+    ],
   },
   {
     id: "pdf-chat",
@@ -81,6 +173,26 @@ export const featuredSkills: Skill[] = [
     downloadUrl: "#",
     isOfficial: true,
     isFeatured: true,
+    installCommand: "npx skills add https://github.com/openai/skills --skill pdf-chat",
+    githubUrl: "https://github.com/openai/skills",
+    githubStars: "367",
+    content: [
+      {
+        heading: "功能说明",
+        body: [
+          "与 PDF 文档进行自然语言对话，快速提取关键信息。支持多文档交叉查询，能够智能生成摘要和关键要点。",
+        ],
+      },
+      {
+        heading: "使用场景",
+        body: [
+          "学术论文阅读与摘要生成",
+          "合同与法律文档关键条款提取",
+          "技术文档快速查询与引用定位",
+          "多文档对比分析与差异发现",
+        ],
+      },
+    ],
   },
 ];
 

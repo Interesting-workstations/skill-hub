@@ -20,6 +20,7 @@ export default function OfficialAuthors({ authors }: Props) {
             key={author.slug}
             href={`/author/${author.slug}`}
             className="author-card"
+            data-animate="card"
           >
             <span className="author-avatar">{author.avatar}</span>
             <div className="author-info">

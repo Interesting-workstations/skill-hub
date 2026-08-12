@@ -27,11 +27,12 @@ const sponsors: Sponsor[] = [
 export default function SponsorBanner() {
   return (
     <div className="sponsor-banner">
-      {sponsors.map((s) => (
+      {sponsors.map((s, i) => (
         <a
           key={s.name}
           href={s.url}
           className="sponsor-card"
+          data-animate="card"
           target="_blank"
           rel="noopener noreferrer"
         >

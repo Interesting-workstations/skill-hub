@@ -1,8 +1,12 @@
 import { useState } from "react";
+import { useButtonMicro } from "../animations";
 import "./Navbar.css";
 
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const langBtnRef = useButtonMicro();
+  const submitBtnRef = useButtonMicro();
+  const menuBtnRef = useButtonMicro();
 
   return (
     <nav className="navbar">
@@ -27,16 +31,17 @@ export default function Navbar() {
         </a>
 
         <div className="navbar-actions">
-          <button className="btn-lang">
+          <button ref={langBtnRef} className="btn-lang">
             简体中文
             <svg width="12" height="12" viewBox="0 0 12 12">
               <path d="M3 5l3 3 3-3" stroke="currentColor" strokeWidth="1.5" fill="none" />
             </svg>
           </button>
-          <a href="/submit" className="btn-submit">
+          <a ref={submitBtnRef} href="/submit" className="btn-submit">
             提交
           </a>
           <button
+            ref={menuBtnRef}
             className="btn-menu"
             onClick={() => setMenuOpen(!menuOpen)}
             aria-label="Open menu"

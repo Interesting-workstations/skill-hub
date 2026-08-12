@@ -3,7 +3,7 @@ import "./Hero.css";
 export default function Hero() {
   return (
     <section className="hero">
-      <div className="hero-content">
+      <div className="hero-content" data-animate="hero-content">
         <h1 className="hero-title">Agent Skills 资源库</h1>
         <p className="hero-desc">
           发现适用于 Claude Code、Codex 等 AI

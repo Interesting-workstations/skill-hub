@@ -1,0 +1,301 @@
+.detail-page {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px 24px 60px;
+}
+
+/* Breadcrumb */
+.detail-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #9ca3af;
+  margin-bottom: 28px;
+}
+
+.detail-breadcrumb a {
+  color: #6b7280;
+  text-decoration: none;
+}
+
+.detail-breadcrumb a:hover {
+  color: #7c3aed;
+}
+
+.detail-breadcrumb span {
+  color: #111827;
+  font-weight: 500;
+}
+
+/* Layout */
+.detail-layout {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 48px;
+}
+
+@media (max-width: 860px) {
+  .detail-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Main content */
+.detail-main {
+  min-width: 0;
+}
+
+/* Header */
+.detail-header {
+  margin-bottom: 36px;
+}
+
+.detail-header-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.detail-icon {
+  font-size: 32px;
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f5f3ff;
+  border-radius: 12px;
+}
+
+.detail-meta h1 {
+  font-size: 28px;
+  font-weight: 800;
+  color: #111827;
+  margin: 0 0 4px;
+  line-height: 1.2;
+}
+
+.detail-author {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.detail-author a {
+  color: #7c3aed;
+  font-weight: 500;
+}
+
+.detail-author a:hover {
+  text-decoration: underline;
+}
+
+.detail-desc {
+  font-size: 16px;
+  color: #4b5563;
+  line-height: 1.7;
+  margin: 0 0 20px;
+}
+
+/* Install command */
+.detail-install {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin-bottom: 16px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #f9fafb;
+}
+
+.detail-install code {
+  flex: 1;
+  padding: 12px 16px;
+  font-size: 13px;
+  font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+  color: #374151;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.btn-copy {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  align-self: stretch;
+  border: none;
+  background: #f3f4f6;
+  color: #6b7280;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+
+.btn-copy:hover {
+  background: #e5e7eb;
+  color: #111827;
+}
+
+/* Action buttons */
+.detail-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.btn-download,
+.btn-github {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 0.15s;
+}
+
+.btn-download {
+  background: #7c3aed;
+  color: white;
+}
+
+.btn-download:hover {
+  background: #6d28d9;
+}
+
+.btn-download:active {
+  transform: scale(0.98);
+  transition: transform 0.08s ease;
+}
+
+.btn-github {
+  background: #111827;
+  color: white;
+}
+
+.btn-github:hover {
+  background: #1f2937;
+}
+
+.btn-github:active {
+  transform: scale(0.98);
+  transition: transform 0.08s ease;
+}
+
+.btn-copy:active {
+  transform: scale(0.95);
+  transition: transform 0.08s ease;
+}
+
+/* Content sections */
+.detail-section {
+  margin-bottom: 28px;
+}
+
+.detail-section h2 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 12px;
+  line-height: 1.4;
+}
+
+.detail-section p {
+  font-size: 15px;
+  color: #4b5563;
+  line-height: 1.75;
+  margin: 0 0 10px;
+}
+
+/* Tags */
+.detail-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 32px 0 16px;
+}
+
+.detail-tag {
+  display: inline-block;
+  padding: 5px 14px;
+  background: #f3f4f6;
+  color: #6b7280;
+  font-size: 12px;
+  border-radius: 20px;
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s;
+}
+
+.detail-tag:hover {
+  background: #7c3aed;
+  color: white;
+}
+
+/* License */
+.detail-license {
+  font-size: 13px;
+  color: #9ca3af;
+  margin-top: 8px;
+}
+
+/* Sidebar */
+.detail-sidebar {
+  position: sticky;
+  top: 80px;
+  align-self: start;
+}
+
+.sidebar-ad {
+  padding: 20px;
+  border: 1px dashed #d1d5db;
+  border-radius: 12px;
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.sidebar-ad-text {
+  font-size: 14px;
+  color: #9ca3af;
+  margin: 0;
+}
+
+.sidebar-ad-text a {
+  color: #7c3aed;
+}
+
+.sidebar-more h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0 0 12px;
+}
+
+.sidebar-skills {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Not found */
+.detail-not-found {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 80px 24px;
+  text-align: center;
+}
+
+.detail-not-found h2 {
+  font-size: 24px;
+  margin-bottom: 12px;
+}
+
+.detail-not-found a {
+  color: #7c3aed;
+  font-weight: 500;
+}
