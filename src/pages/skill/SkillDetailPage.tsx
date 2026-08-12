@@ -1,17 +1,20 @@
 import { useParams, Link } from "react-router-dom";
 import { useRef, useCallback } from "react";
-import { getAllSkills } from "../../data/queries";
 import SkillCard from "../../components/skill/SkillCard";
 import { sectionEnter, buttonClick, panelEnterRight } from "../../animations";
 import { usePageAnimation } from "../../hooks/usePageAnimation";
 import { usePageMeta } from "../../hooks/usePageMeta";
+import { useSkill, useSkills } from "../../hooks/useSkillData";
+import PageLoading from "../../components/shared/PageLoading";
 import { site } from "../../config/site";
 import "./SkillDetailPage.css";
 
 export default function SkillDetailPage() {
   const { skillId } = useParams<{ skillId: string }>();
-  const allSkills = getAllSkills();
-  const skill = allSkills.find((s) => s.id === skillId);
+  const { data: skill, loading } = useSkill(skillId);
+  // 同作者的其他技能（skill 未就绪时不请求）
+  const { data: authorSkillsData } = useSkills(skill ? { author: skill.author } : null);
+  const authorSkills = (authorSkillsData ?? []).filter((s) => s.id !== skill?.id);
   const sidebarRef = useRef<HTMLElement>(null);
   const copyBtnRef = useRef<HTMLButtonElement>(null);
 
@@ -34,12 +37,16 @@ export default function SkillDetailPage() {
     if (sidebarRef.current) {
       ctx.add(panelEnterRight(sidebarRef.current));
     }
-  }, [skillId]);
+  }, [skillId, skill]);
 
   usePageMeta({
     title: skill ? `${skill.name} — ${site.name}` : site.title,
     description: skill?.description,
   });
+
+  if (loading) {
+    return <PageLoading />;
+  }
 
   if (!skill) {
     return (
@@ -49,10 +56,6 @@ export default function SkillDetailPage() {
       </div>
     );
   }
-
-  const authorSkills = allSkills.filter(
-    (s) => s.author === skill.author && s.id !== skill.id
-  );
 
   return (
     <div className="detail-page" ref={pageRef}>

@@ -1,30 +1,35 @@
 import { useParams, Link } from "react-router-dom";
-import { authors } from "../../data/skills";
-import { getSkillsByAuthor } from "../../data/queries";
 import SkillCard from "../../components/skill/SkillCard";
 import { sectionEnter } from "../../animations";
 import { usePageAnimation } from "../../hooks/usePageAnimation";
 import { usePageMeta } from "../../hooks/usePageMeta";
-import { site } from "../../config/site";
+import { useAuthor } from "../../hooks/useSkillData";
 import PageContainer from "../../components/shared/PageContainer";
 import Breadcrumb from "../../components/shared/Breadcrumb";
+import PageLoading from "../../components/shared/PageLoading";
+import { site } from "../../config/site";
 
 export default function AuthorPage() {
   const { authorSlug } = useParams<{ authorSlug: string }>();
-  const author = authors.find((a) => a.slug === authorSlug);
-  const skills = author ? getSkillsByAuthor(author.name) : [];
+  const { data: detail, loading } = useAuthor(authorSlug);
+  const author = detail?.author ?? null;
+  const skills = detail?.skills ?? [];
 
   const pageRef = usePageAnimation((container, ctx) => {
     const cards = container.querySelectorAll(".skill-card");
     if (cards.length > 0) {
       ctx.add(sectionEnter(cards, { fromY: 12 }));
     }
-  }, [authorSlug]);
+  }, [authorSlug, skills.length]);
 
   usePageMeta({
     title: author ? `${author.name} — ${site.name}` : site.title,
     description: author ? `浏览 ${author.name} 发布的全部技能` : undefined,
   });
+
+  if (loading) {
+    return <PageLoading />;
+  }
 
   if (!author) {
     return (

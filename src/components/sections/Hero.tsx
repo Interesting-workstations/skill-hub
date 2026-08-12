@@ -1,17 +1,18 @@
 import { useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { sectionEnter, createAnimationContext } from "../../animations";
-import { authors, skillCategories } from "../../data/skills";
-import { getAllSkills, getOfficialSkills } from "../../data/queries";
+import { useStats } from "../../hooks/useSkillData";
 import "./Hero.css";
 
 export default function Hero() {
   const heroRef = useRef<HTMLElement>(null);
   const ctx = useRef(createAnimationContext());
+  const { data: stats } = useStats();
 
-  const allSkills = getAllSkills();
-  const officialCount = getOfficialSkills().length;
-  const categoryCount = skillCategories.length;
+  const allSkillsCount = stats?.totalSkills ?? 0;
+  const authorsCount = stats?.totalAuthors ?? 0;
+  const categoryCount = stats?.totalCategories ?? 0;
+  const officialCount = stats?.officialSkills ?? 0;
 
   useEffect(() => {
     if (!heroRef.current) return;
@@ -46,12 +47,12 @@ export default function Hero() {
       {/* 数据统计 */}
       <div className="hero-stats">
         <div className="hero-stat">
-          <span className="hero-stat-num">{allSkills.length}+</span>
+          <span className="hero-stat-num">{allSkillsCount}+</span>
           <span className="hero-stat-label">收录技能</span>
         </div>
         <div className="hero-stat-divider" />
         <div className="hero-stat">
-          <span className="hero-stat-num">{authors.length}+</span>
+          <span className="hero-stat-num">{authorsCount}+</span>
           <span className="hero-stat-label">官方作者</span>
         </div>
         <div className="hero-stat-divider" />
