@@ -1,20 +1,27 @@
 package crawler
 
+// ContentSection SKILL.md 正文的一个内容区块（## 标题 + 段落）。
+type ContentSection struct {
+	Heading string   `json:"heading"`
+	Body    []string `json:"body"`
+}
+
 // Skill 爬取到的技能数据，与 server 数据模型（domain.Skill）字段对齐。
 type Skill struct {
-	ID             string   `json:"id"`
-	Name           string   `json:"name"`
-	Author         string   `json:"author"`
-	Description    string   `json:"description"`
-	Tags           []string `json:"tags"`
-	Category       string   `json:"category"`
-	DownloadURL    string   `json:"downloadUrl"`
-	IsOfficial     bool     `json:"isOfficial"`
-	IsFeatured     bool     `json:"isFeatured"`
-	InstallCommand string   `json:"installCommand,omitempty"`
-	GithubURL      string   `json:"githubUrl,omitempty"`
-	GithubStars    string   `json:"githubStars,omitempty"`
-	License        string   `json:"license,omitempty"`
+	ID             string           `json:"id"`
+	Name           string           `json:"name"`
+	Author         string           `json:"author"`
+	Description    string           `json:"description"`
+	Tags           []string         `json:"tags"`
+	Category       string           `json:"category"`
+	DownloadURL    string           `json:"downloadUrl"`
+	IsOfficial     bool             `json:"isOfficial"`
+	IsFeatured     bool             `json:"isFeatured"`
+	InstallCommand string           `json:"installCommand,omitempty"`
+	GithubURL      string           `json:"githubUrl,omitempty"`
+	GithubStars    string           `json:"githubStars,omitempty"`
+	License        string           `json:"license,omitempty"`
+	Content        []ContentSection `json:"content,omitempty"`
 }
 
 // Repo GitHub 仓库信息。

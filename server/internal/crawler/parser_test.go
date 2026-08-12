@@ -55,3 +55,51 @@ func TestFormatStars(t *testing.T) {
 		}
 	}
 }
+
+func TestParseContent_Sections(t *testing.T) {
+	content := `---
+name: my-skill
+description: A test skill
+---
+# My Skill
+
+这是简介段落。
+
+## 使用方法
+
+先安装，再使用。
+
+- 步骤一
+- 步骤二
+
+## 注意事项
+
+请小心。
+`
+	sections := ParseContent(content)
+	if len(sections) != 3 {
+		t.Fatalf("期望 3 个内容区块，实际 %d", len(sections))
+	}
+	if sections[0].Heading != "概述" || len(sections[0].Body) != 1 || sections[0].Body[0] != "这是简介段落。" {
+		t.Fatalf("概述区块解析错误: %+v", sections[0])
+	}
+	if sections[1].Heading != "使用方法" || len(sections[1].Body) != 3 {
+		t.Fatalf("使用方法区块解析错误: %+v", sections[1])
+	}
+	if sections[2].Heading != "注意事项" {
+		t.Fatalf("注意事项区块解析错误: %+v", sections[2])
+	}
+}
+
+func TestParseContent_NoHeading(t *testing.T) {
+	content := `# Tool
+Some intro line.
+Another line.`
+	sections := ParseContent(content)
+	if len(sections) != 1 {
+		t.Fatalf("期望 1 个区块，实际 %d", len(sections))
+	}
+	if sections[0].Heading != "概述" || len(sections[0].Body) != 2 {
+		t.Fatalf("无标题时应归入概述区块: %+v", sections[0])
+	}
+}

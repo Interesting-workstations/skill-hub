@@ -118,6 +118,10 @@ func toStore(skills []crawler.Skill) domain.Store {
 
 // toDomainSkill 将爬虫技能转换为领域技能。
 func toDomainSkill(s crawler.Skill) domain.Skill {
+	content := make([]domain.ContentSection, 0, len(s.Content))
+	for _, sec := range s.Content {
+		content = append(content, domain.ContentSection{Heading: sec.Heading, Body: sec.Body})
+	}
 	return domain.Skill{
 		ID:             s.ID,
 		Name:           s.Name,
@@ -132,6 +136,7 @@ func toDomainSkill(s crawler.Skill) domain.Skill {
 		GithubURL:      s.GithubURL,
 		GithubStars:    s.GithubStars,
 		License:        s.License,
+		Content:        content,
 	}
 }
 

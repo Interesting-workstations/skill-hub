@@ -92,6 +92,7 @@ type InsertSkill struct {
 	GithubStars string
 	License     string
 	Tags        []string
+	Content     []domain.ContentSection
 }
 
 type mysqlRepo struct {
@@ -626,6 +627,7 @@ func (r *mysqlRepo) InsertCrawledSkills(skills []InsertSkill) error {
 	defer tx.Rollback()
 	for _, s := range skills {
 		tags, _ := json.Marshal(s.Tags)
+		content, _ := json.Marshal(s.Content)
 		official := 0
 		if s.IsOfficial {
 			official = 1
@@ -633,9 +635,9 @@ func (r *mysqlRepo) InsertCrawledSkills(skills []InsertSkill) error {
 		if _, err := tx.Exec(
 			`INSERT INTO skills(id, name, author, description, category, download_url,
 				is_official, is_featured, install_command, github_url, github_stars, license, tags, content, data_status)
-			 VALUES(?,?,?,?,?,?,?,0,'',?,?,?,?,'[]','pending')`,
+			 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 			s.ID, s.Name, s.Author, s.Description, s.Category, s.DownloadURL,
-			official, s.GithubURL, s.GithubStars, s.License, tags,
+			official, 0, "", s.GithubURL, s.GithubStars, s.License, string(tags), string(content), "pending",
 		); err != nil {
 			return err
 		}

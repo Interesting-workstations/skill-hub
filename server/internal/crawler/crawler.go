@@ -168,6 +168,7 @@ func (c *Client) buildSkill(repo Repo, skillName, mdPath string) (Skill, error) 
 		GithubStars: formatStars(repo.Stars),
 		License:     license,
 		IsOfficial:  IsOfficialOrg(owner),
+		Content:     ParseContent(string(content)),
 	}, nil
 }
 

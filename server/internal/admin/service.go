@@ -241,7 +241,8 @@ func (s *Service) executeTask(taskID, taskName, query, execID string) {
 		insert = append(insert, InsertSkill{
 			ID: sk.ID, Name: sk.Name, Author: sk.Author, Description: sk.Description,
 			Category: sk.Category, DownloadURL: sk.DownloadURL, IsOfficial: sk.IsOfficial,
-			GithubURL: sk.GithubURL, GithubStars: sk.GithubStars, License: sk.License, Tags: sk.Tags,
+			GithubURL: sk.GithubURL, GithubStars: sk.GithubStars, License: sk.License,
+			Tags: sk.Tags, Content: toContentSections(sk.Content),
 		})
 	}
 	if len(insert) > 0 {
@@ -403,6 +404,18 @@ func splitRepos(s string) []string {
 		if p := strings.TrimSpace(part); p != "" {
 			out = append(out, p)
 		}
+	}
+	return out
+}
+
+// toContentSections 将爬虫内容区块转换为领域模型。
+func toContentSections(in []crawler.ContentSection) []domain.ContentSection {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make([]domain.ContentSection, 0, len(in))
+	for _, s := range in {
+		out = append(out, domain.ContentSection{Heading: s.Heading, Body: s.Body})
 	}
 	return out
 }

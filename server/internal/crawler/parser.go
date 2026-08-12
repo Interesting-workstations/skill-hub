@@ -73,3 +73,49 @@ func truncate(s string, n int) string {
 	}
 	return string(runes[:n]) + "…"
 }
+
+// ParseContent 从 SKILL.md 正文解析为内容区块。
+// 规则：`# ` 主标题跳过（作为 name）；`## / ### ` 开始新内容区块；
+// 其余非空行追加到当前区块正文；主标题后的简介段落归入「概述」。
+func ParseContent(text string) []ContentSection {
+	text = stripFrontmatter(text)
+	var sections []ContentSection
+	current := -1
+
+	lines := strings.Split(text, "\n")
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		if strings.HasPrefix(trimmed, "##") || strings.HasPrefix(trimmed, "###") {
+			heading := strings.TrimSpace(strings.TrimLeft(trimmed, "# "))
+			sections = append(sections, ContentSection{Heading: heading})
+			current = len(sections) - 1
+			continue
+		}
+		if strings.HasPrefix(trimmed, "# ") {
+			continue // 主标题 = name
+		}
+		if current < 0 {
+			sections = append(sections, ContentSection{Heading: "概述"})
+			current = len(sections) - 1
+		}
+		sections[current].Body = append(sections[current].Body, trimmed)
+	}
+
+	// 丢弃只有标题没有正文的区块
+	var out []ContentSection
+	for _, s := range sections {
+		if len(s.Body) == 0 {
+			continue
+		}
+		out = append(out, s)
+	}
+	return out
+}
+
+// stripFrontmatter 移除文档开头的 YAML frontmatter（--- ... ---）。
+func stripFrontmatter(text string) string {
+	return frontmatterRe.ReplaceAllString(text, "")
+}
