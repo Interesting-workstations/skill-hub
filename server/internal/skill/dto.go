@@ -12,7 +12,7 @@ type SkillFilter struct {
 
 // AuthorDetail 作者及其技能（作者详情响应）。
 type AuthorDetail struct {
-	Author domain.Author `json:"author"`
+	Author domain.Author  `json:"author"`
 	Skills []domain.Skill `json:"skills"`
 }
 

@@ -8,11 +8,11 @@ import (
 
 // 业务错误码：0 表示成功，其余按类别分段。
 const (
-	CodeOK              = 0
-	CodeInvalidParam    = 40001 // 参数错误
-	CodeNotFound        = 40401 // 资源不存在
-	CodeMethodNotAllow  = 40501 // 方法不允许
-	CodeInternalError   = 50001 // 系统错误
+	CodeOK             = 0
+	CodeInvalidParam   = 40001 // 参数错误
+	CodeNotFound       = 40401 // 资源不存在
+	CodeMethodNotAllow = 40501 // 方法不允许
+	CodeInternalError  = 50001 // 系统错误
 )
 
 // Body 统一响应体。
