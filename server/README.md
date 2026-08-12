@@ -1,0 +1,98 @@
+# Agent Skills API（后端）
+
+Agent Skills 资源库后端服务（Go），采用**模块化单体（Modular Monolith）** + 分层架构，为前端官网（[skill-hub](https://github.com/Interesting-workstations/skill-hub)）提供技能数据 API。
+
+## 技术栈
+
+- Go 1.23+（标准库 `net/http`，零第三方依赖）
+- 内存 Repository + JSON 种子数据（`data/skills.json`）
+- 统一响应格式 `{ code, message, data }`
+
+## 快速开始
+
+```bash
+go run ./cmd/server          # 默认监听 :8080
+# 或指定端口与数据源
+SERVER_ADDR=:9090 DATA_PATH=data/skills.json go run ./cmd/server
+```
+
+## 测试
+
+```bash
+go test ./...
+```
+
+## API 一览
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/v1/health` | 健康检查 |
+| GET | `/api/v1/stats` | 站点聚合统计（技能/作者/分类/官方/精选数量） |
+| GET | `/api/v1/skills` | 技能列表（`?category=&author=&official=&featured=` 筛选） |
+| GET | `/api/v1/skills/{id}` | 技能详情（含 content 内容区块） |
+| GET | `/api/v1/authors` | 作者列表 |
+| GET | `/api/v1/authors/{slug}` | 作者详情（含其发布的技能） |
+| GET | `/api/v1/categories` | 分类列表（含分类下技能） |
+| GET | `/api/v1/categories/{slug}` | 分类详情 |
+
+### 统一响应
+
+```json
+// 成功
+{ "code": 0, "message": "success", "data": { } }
+// 错误（不暴露内部细节）
+{ "code": 40401, "message": "技能不存在", "data": null }
+```
+
+错误码：`0` 成功 · `40001` 参数错误 · `40401` 资源不存在 · `40501` 方法不允许 · `50001` 系统错误
+
+## 目录结构
+
+```
+server/
+├── cmd/server/main.go        # 启动入口（优雅关闭）
+├── internal/
+│   ├── domain/model.go       # 领域模型（Skill/Author/Category）
+│   ├── skill/                # 技能业务模块
+│   │   ├── handler.go        #   HTTP 层：参数解析/统一响应
+│   │   ├── service.go        #   业务逻辑层：筛选/统计
+│   │   ├── repository.go     #   数据访问层：内存 + JSON 种子
+│   │   └── dto.go            #   DTO：请求/响应结构
+│   ├── response/response.go  # 统一响应与业务错误码
+│   ├── middleware/           # RequestID / Recovery / Logger / CORS
+│   └── router/router.go      # 路由组装
+└── data/skills.json          # 种子数据
+```
+
+## 架构分层
+
+```
+HTTP
+ ↓
+Router + Middleware（RequestID → Recovery → Logger → CORS）
+ ↓
+Handler        ← 只做参数解析、调用 Service、返回响应
+ ↓
+Service        ← 业务规则与数据组合，不感知 HTTP
+ ↓
+Repository     ← 数据访问接口（当前内存实现，可替换为数据库）
+ ↓
+JSON 种子数据
+```
+
+## 设计说明
+
+- **模块化单体**：按后端架构规范分层，但根据项目实际（只读资源站）未引入认证/数据库等当前不需要的能力，避免过度设计
+- **Repository 接口**：业务层只依赖接口，未来接入 MySQL/PostgreSQL 时只需新增实现，无需改动 Service/Handler
+- **错误处理**：统一错误码，内部错误记录日志，客户端只看到安全通用信息
+- **日志**：请求 ID / 方法 / 路径 / 状态码 / 耗时
+- **可测试**：Service 依赖 Repository 接口，便于单元测试
+
+## 配置
+
+通过环境变量配置（不硬编码）：
+
+| 变量 | 默认值 | 说明 |
+|---|---|---|
+| `SERVER_ADDR` | `:8080` | 监听地址 |
+| `DATA_PATH` | `data/skills.json` | 种子数据路径 |
