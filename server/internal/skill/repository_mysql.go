@@ -205,9 +205,17 @@ func (r *mysqlRepo) SkillByID(id string) (domain.Skill, bool) {
 	return s, ok
 }
 
-// AllAuthors 返回全部作者。
+// AllAuthors 返回全部作者；SkillCount 为该作者下实际技能数、
+// OfficialSkills 为官方技能数（均实时统计）。
 func (r *mysqlRepo) AllAuthors() []domain.Author {
-	rows, err := r.db.Query(`SELECT slug, name, avatar, skill_count FROM authors`)
+	rows, err := r.db.Query(`
+		SELECT a.slug, a.name, a.avatar,
+			COUNT(s.id),
+			COALESCE(SUM(s.is_official), 0)
+		FROM authors a
+		LEFT JOIN skills s ON s.author = a.slug
+		GROUP BY a.slug, a.name, a.avatar
+		ORDER BY a.slug`)
 	if err != nil {
 		return nil
 	}
@@ -216,7 +224,7 @@ func (r *mysqlRepo) AllAuthors() []domain.Author {
 	authors := make([]domain.Author, 0, 16)
 	for rows.Next() {
 		var a domain.Author
-		if err := rows.Scan(&a.Slug, &a.Name, &a.Avatar, &a.SkillCount); err != nil {
+		if err := rows.Scan(&a.Slug, &a.Name, &a.Avatar, &a.SkillCount, &a.OfficialSkills); err != nil {
 			continue
 		}
 		authors = append(authors, a)

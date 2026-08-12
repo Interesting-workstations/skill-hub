@@ -25,6 +25,7 @@ export interface Author {
   avatar: string;
   skillCount: number;
   slug: string;
+  officialSkills?: number;
 }
 
 export interface Category {

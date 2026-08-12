@@ -59,7 +59,19 @@ func (r *memoryRepo) SkillByID(id string) (domain.Skill, bool) {
 }
 
 func (r *memoryRepo) AllAuthors() []domain.Author {
-	return r.store.Authors
+	authors := make([]domain.Author, len(r.store.Authors))
+	copy(authors, r.store.Authors)
+	// 实时统计官方技能数
+	official := make(map[string]int)
+	for _, s := range r.AllSkills() {
+		if s.IsOfficial {
+			official[s.Author]++
+		}
+	}
+	for i := range authors {
+		authors[i].OfficialSkills = official[authors[i].Name]
+	}
+	return authors
 }
 
 func (r *memoryRepo) AllCategories() []domain.Category {

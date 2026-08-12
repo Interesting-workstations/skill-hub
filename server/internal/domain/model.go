@@ -32,6 +32,8 @@ type Author struct {
 	Avatar     string `json:"avatar"`
 	SkillCount int    `json:"skillCount"`
 	Slug       string `json:"slug"`
+	// OfficialSkills 该作者的官方技能数（实时统计）。
+	OfficialSkills int `json:"officialSkills"`
 }
 
 // Category 表示技能分类（含该分类下的技能列表）。
