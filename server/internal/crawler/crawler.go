@@ -10,6 +10,8 @@ import (
 type CrawlOptions struct {
 	// Query 搜索关键词（可多次指定不同关键词，内部去重）。
 	Query string
+	// Repos 额外指定要爬取的仓库（如 "anthropics/skills"），优先于搜索结果。
+	Repos []string
 	// Limit 最多处理的仓库数量。
 	Limit int
 	// PerPage 每次搜索返回的仓库数。
@@ -21,8 +23,33 @@ func DefaultOptions() CrawlOptions {
 	return CrawlOptions{Query: "agent skills", Limit: 20, PerPage: 10}
 }
 
-// Crawl 执行爬取：搜索仓库 → 识别并解析 skill → 返回去重后的技能列表。
+// Crawl 执行爬取：先爬取指定仓库，再按关键词搜索补充，最后去重返回技能列表。
 func (c *Client) Crawl(opts CrawlOptions) ([]Skill, error) {
+	seen := make(map[string]bool)
+	var skills []Skill
+
+	// 1. 指定仓库（通常是官方仓库）
+	for _, fullName := range opts.Repos {
+		repo, err := c.GetRepo(fullName)
+		if err != nil {
+			fmt.Printf("  ⚠️ 跳过 %s: %v\n", fullName, err)
+			continue
+		}
+		got, err := c.crawlRepo(repo)
+		if err != nil {
+			fmt.Printf("  ⚠️ 跳过 %s: %v\n", fullName, err)
+			continue
+		}
+		for _, s := range got {
+			if seen[s.ID] {
+				continue
+			}
+			seen[s.ID] = true
+			skills = append(skills, s)
+		}
+	}
+
+	// 2. 搜索结果补充
 	repos, err := c.SearchRepos(opts.Query, opts.PerPage, 1)
 	if err != nil {
 		return nil, fmt.Errorf("搜索仓库失败: %w", err)
@@ -30,9 +57,6 @@ func (c *Client) Crawl(opts CrawlOptions) ([]Skill, error) {
 	if len(repos) > opts.Limit {
 		repos = repos[:opts.Limit]
 	}
-
-	seen := make(map[string]bool)
-	var skills []Skill
 	for _, repo := range repos {
 		got, err := c.crawlRepo(repo)
 		if err != nil {
@@ -90,6 +114,7 @@ func (c *Client) crawlRepo(repo Repo) ([]Skill, error) {
 }
 
 // buildSkill 读取 SKILL.md 并组装 Skill 记录。
+// 官方组织仓库的技能会标记为官方（IsOfficial），并根据内容推断分类。
 func (c *Client) buildSkill(repo Repo, skillName, mdPath string) (Skill, error) {
 	content, err := c.GetFile(repo.FullName, mdPath, repo.DefaultBranch)
 	if err != nil {
@@ -116,18 +141,78 @@ func (c *Client) buildSkill(repo Repo, skillName, mdPath string) (Skill, error) 
 		}
 	}
 
+	owner := strings.Split(repo.FullName, "/")[0]
 	return Skill{
 		ID:          id,
 		Name:        name,
-		Author:      strings.Split(repo.FullName, "/")[0],
+		Author:      owner,
 		Description: desc,
 		Tags:        inferTags(name, desc),
-		Category:    "development",
+		Category:    inferCategory(name, desc),
 		DownloadURL: repo.HTMLURL + "/archive/refs/heads/" + repo.DefaultBranch + ".zip",
 		GithubURL:   repo.HTMLURL,
 		GithubStars: formatStars(repo.Stars),
 		License:     license,
+		IsOfficial:  IsOfficialOrg(owner),
 	}, nil
+}
+
+// officialOrgs 官方组织及其在站点上展示的头像 emoji。
+var officialOrgs = map[string]string{
+	"anthropics":          "🅰️",
+	"openai":              "🤖",
+	"microsoft":           "🪟",
+	"vercel":              "▲",
+	"google":              "🇬",
+	"googlecloudplatform": "🇬",
+	"github":              "🐙",
+	"cloudflare":          "☁️",
+	"figma":               "🎨",
+	"notion":              "📝",
+	"stripe":              "💳",
+	"aws":                 "☁️",
+	"aws-samples":         "☁️",
+	"sst":                 "▲",
+}
+
+// IsOfficialOrg 判断仓库 owner 是否为官方组织。
+func IsOfficialOrg(owner string) bool {
+	_, ok := officialOrgs[strings.ToLower(owner)]
+	return ok
+}
+
+// OfficialAvatar 返回官方组织的头像 emoji；非官方组织返回空字符串。
+func OfficialAvatar(owner string) string {
+	return officialOrgs[strings.ToLower(owner)]
+}
+
+// categoryRules 分类推断规则（按顺序匹配，命中即返回）。
+var categoryRules = []struct {
+	category string
+	keywords []string
+}{
+	{"browser-automation", []string{"playwright", "selenium", "puppeteer", "web automation", "browser automation", "web scraping", "scraping", "scrape", "headless browser"}},
+	{"database", []string{"database", "sql", "postgres", "mysql", "redis", "mongo", "sqlite", "storage", "data lake", "cassandra"}},
+	{"document", []string{"document", "pdf", "word", "excel", "markdown", "office", "spreadsheet", "presentation", "docx", "slide", "google docs"}},
+	{"media", []string{"image", "video", "audio", "media", "photo", "3d", "animation", "music", "voice"}},
+	{"creative", []string{"design", "ui", "ux", "art", "creative", "brand", "logo", "figma", "illustration"}},
+	{"productivity", []string{"productivity", "task", "meeting", "notes", "calendar", "email", "gmail", "notion", "workflow", "schedule", "todo", "reminder", "inbox"}},
+	{"testing", []string{"testing", "test automation", "unit test", "e2e", "end-to-end", "qa", "test coverage", "test suite", "regression"}},
+	{"security", []string{"security", "auth", "encryption", "penetration", "vulnerability", "cyber"}},
+	{"development", []string{"code", "develop", "programming", "git", "github", "api", "backend", "frontend", "engineering", "debug", "refactor", "sdk"}},
+}
+
+// inferCategory 从名称与描述推断技能分类；无法匹配时默认 development。
+func inferCategory(name, desc string) string {
+	text := strings.ToLower(name + " " + desc)
+	for _, rule := range categoryRules {
+		for _, kw := range rule.keywords {
+			if strings.Contains(text, kw) {
+				return rule.category
+			}
+		}
+	}
+	return "development"
 }
 
 // formatStars 将 star 数格式化为可读字符串（如 239、1.2k、3.4k）。
@@ -155,8 +240,8 @@ func inferTags(name, desc string) []string {
 	return tags
 }
 
-// slugify 转小写并将非字母数字字符替换为 -。
-func slugify(s string) string {
+// Slugify 转小写并将非字母数字字符替换为 -。
+func Slugify(s string) string {
 	var b strings.Builder
 	for _, r := range strings.ToLower(s) {
 		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
@@ -167,3 +252,6 @@ func slugify(s string) string {
 	}
 	return strings.Trim(b.String(), "-")
 }
+
+// slugify 保留旧名以兼容。
+func slugify(s string) string { return Slugify(s) }

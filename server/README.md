@@ -71,13 +71,30 @@ go run ./cmd/crawler -query "claude skills" -limit 50 -output data/crawled-skill
 1. 仓库根目录存在 `SKILL.md` → 整个仓库作为一个技能
 2. 存在 `skills/`（或 `skillsets/`）目录 → 其下每个含 `SKILL.md` 的子目录为一个技能
 
-**提取字段**：名称（SKILL.md frontmatter 或目录名）、描述、作者、标签、下载链接（zip）、GitHub 地址、stars、License。
+**官方与分类识别**：
+
+- **官方技能**：来自官方组织仓库（anthropics、openai、microsoft、vercel、google、github、cloudflare、figma、notion、stripe、aws 等）的技能自动标记 `isOfficial=true`，并在首页「官方技能」区块展示；
+- **分类推断**：根据技能名称与描述关键词自动归类（browser-automation、database、document、media、creative、productivity、testing、security、development 等）。
+
+**提取字段**：名称（SKILL.md frontmatter 或目录名）、描述、作者、标签、分类、官方标记、下载链接（zip）、GitHub 地址、stars、License。
+
+## 📥 导入数据库（cmd/import）
+
+将爬取结果全量导入 MySQL（替换现有数据，官方技能按分类组织）：
 
 ```bash
-# 示例：爬取结果合并入种子数据后重新运行服务
+# 1. 爬取
 go run ./cmd/crawler -query "claude skills" -limit 50 -output data/crawled-skills.json
+# 2. 导入（全量替换数据库）
+go run ./cmd/import -input data/crawled-skills.json
+# 3. 重启服务即可生效
 go run ./cmd/server
 ```
+
+| 参数 | 默认值 | 说明 |
+|---|---|---|
+| `-input` | （必填） | 爬虫输出的 JSON 文件路径 |
+| `-dsn` | `root:root@tcp(127.0.0.1:3306)/skillhub?...` | MySQL 连接串 |
 
 ## 测试
 

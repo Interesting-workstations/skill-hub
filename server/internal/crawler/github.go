@@ -59,6 +59,15 @@ func (c *Client) SearchRepos(query string, perPage, page int) ([]Repo, error) {
 	return result.Items, nil
 }
 
+// GetRepo 获取单个仓库的详细信息（含默认分支、star、license）。
+func (c *Client) GetRepo(fullName string) (Repo, error) {
+	var repo Repo
+	if err := c.get("/repos/"+fullName, &repo); err != nil {
+		return Repo{}, err
+	}
+	return repo, nil
+}
+
 // ListContents 列出仓库某路径下的内容。
 func (c *Client) ListContents(fullName, path, ref string) ([]ContentEntry, error) {
 	p := "/repos/" + fullName + "/contents/" + path

@@ -35,11 +35,22 @@ func NewMySQLRepository(dsn, seedJSONPath string) (Repository, error) {
 		db.Close()
 		return nil, err
 	}
-	if err := repo.seedIfEmpty(seedJSONPath); err != nil {
-		db.Close()
-		return nil, err
+	if seedJSONPath != "" {
+		if err := repo.seedIfEmpty(seedJSONPath); err != nil {
+			db.Close()
+			return nil, err
+		}
 	}
 	return repo, nil
+}
+
+// ReplaceAll 清空数据库全部表并用 store 重建（用于导入爬取数据）。
+func ReplaceAll(dsn string, store domain.Store) error {
+	repo, err := NewMySQLRepository(dsn, "")
+	if err != nil {
+		return err
+	}
+	return repo.(*mysqlRepo).replaceAll(store)
 }
 
 // ensureDatabase 解析 DSN，目标数据库不存在时自动创建（utf8mb4）。
@@ -122,13 +133,42 @@ func (r *mysqlRepo) seedIfEmpty(seedJSONPath string) error {
 	if err := json.Unmarshal(data, &store); err != nil {
 		return fmt.Errorf("解析种子数据失败: %w", err)
 	}
+	return r.insertStore(store)
+}
 
+// insertStore 在单个事务中写入作者、分类与技能。
+func (r *mysqlRepo) insertStore(store domain.Store) error {
 	tx, err := r.db.Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
+	if err := r.insertStoreTx(tx, store); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
 
+// replaceAll 清空全部数据表并用 store 重建。
+func (r *mysqlRepo) replaceAll(store domain.Store) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	for _, table := range []string{"skills", "authors", "categories"} {
+		if _, err := tx.Exec(`DELETE FROM ` + table); err != nil {
+			return err
+		}
+	}
+	if err := r.insertStoreTx(tx, store); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// insertStoreTx 向事务写入作者、分类与技能。
+func (r *mysqlRepo) insertStoreTx(tx *sql.Tx, store domain.Store) error {
 	for _, a := range store.Authors {
 		if _, err := tx.Exec(
 			`INSERT IGNORE INTO authors(slug, name, avatar, skill_count) VALUES(?,?,?,?)`,
@@ -151,7 +191,7 @@ func (r *mysqlRepo) seedIfEmpty(seedJSONPath string) error {
 			return err
 		}
 	}
-	return tx.Commit()
+	return nil
 }
 
 // insertSkill 插入一条技能记录。
