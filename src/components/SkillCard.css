@@ -6,7 +6,7 @@
   border-radius: 12px;
   text-decoration: none;
   color: inherit;
-  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s ease;
+  transition: border-color 0.2s, box-shadow 0.2s;
   background: white;
   min-width: 0;
 }
@@ -14,7 +14,6 @@
 .skill-card:hover {
   border-color: #c4b5fd;
   box-shadow: 0 4px 24px rgba(124, 58, 237, 0.08);
-  transform: translateY(-2px);
 }
 
 .skill-card-top {
@@ -75,11 +74,6 @@
 .skill-card-download:hover {
   border-color: #7c3aed;
   color: #7c3aed;
-}
-
-.skill-card-download:active {
-  transform: scale(0.95);
-  transition: transform 0.08s ease;
 }
 
 .skill-card-desc {

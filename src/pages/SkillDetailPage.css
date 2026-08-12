@@ -169,11 +169,6 @@
   background: #6d28d9;
 }
 
-.btn-download:active {
-  transform: scale(0.98);
-  transition: transform 0.08s ease;
-}
-
 .btn-github {
   background: #111827;
   color: white;
@@ -181,16 +176,6 @@
 
 .btn-github:hover {
   background: #1f2937;
-}
-
-.btn-github:active {
-  transform: scale(0.98);
-  transition: transform 0.08s ease;
-}
-
-.btn-copy:active {
-  transform: scale(0.95);
-  transition: transform 0.08s ease;
 }
 
 /* Content sections */

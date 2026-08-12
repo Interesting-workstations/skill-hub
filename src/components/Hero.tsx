@@ -1,9 +1,29 @@
+import { useEffect, useRef } from "react";
+import { sectionEnter, createAnimationContext } from "../animations";
 import "./Hero.css";
 
 export default function Hero() {
+  const heroRef = useRef<HTMLElement>(null);
+  const ctx = useRef(createAnimationContext());
+
+  useEffect(() => {
+    if (!heroRef.current) return;
+    ctx.current.killAll();
+
+    const children = heroRef.current.querySelectorAll(".hero-content > *, .hero-video");
+    if (children.length > 0) {
+      const st = sectionEnter(children, { fromY: 16, staggerAmount: 0.08 });
+      ctx.current.add(st);
+    }
+
+    return () => {
+      ctx.current.killAll();
+    };
+  }, []);
+
   return (
-    <section className="hero">
-      <div className="hero-content" data-animate="hero-content">
+    <section className="hero" ref={heroRef}>
+      <div className="hero-content">
         <h1 className="hero-title">Agent Skills 资源库</h1>
         <p className="hero-desc">
           发现适用于 Claude Code、Codex 等 AI

@@ -16,14 +16,13 @@
   border-radius: 12px;
   text-decoration: none;
   color: inherit;
-  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s ease;
+  transition: border-color 0.2s, box-shadow 0.2s;
   background: white;
 }
 
 .sponsor-card:hover {
   border-color: #c4b5fd;
   box-shadow: 0 4px 20px rgba(124, 58, 237, 0.08);
-  transform: translateY(-2px);
 }
 
 .sponsor-logo {

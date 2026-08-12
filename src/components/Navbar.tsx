@@ -1,12 +1,15 @@
-import { useState } from "react";
-import { useButtonMicro } from "../animations";
+import { useState, useRef } from "react";
+import { buttonHoverEnter, buttonHoverLeave, buttonClick } from "../animations";
 import "./Navbar.css";
 
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
-  const langBtnRef = useButtonMicro();
-  const submitBtnRef = useButtonMicro();
-  const menuBtnRef = useButtonMicro();
+  const submitRef = useRef<HTMLAnchorElement>(null);
+  const langRef = useRef<HTMLButtonElement>(null);
+
+  const handleSubmitClick = () => {
+    if (submitRef.current) buttonClick(submitRef.current);
+  };
 
   return (
     <nav className="navbar">
@@ -31,17 +34,28 @@ export default function Navbar() {
         </a>
 
         <div className="navbar-actions">
-          <button ref={langBtnRef} className="btn-lang">
+          <button
+            className="btn-lang"
+            ref={langRef}
+            onMouseEnter={() => langRef.current && buttonHoverEnter(langRef.current)}
+            onMouseLeave={() => langRef.current && buttonHoverLeave(langRef.current)}
+          >
             简体中文
             <svg width="12" height="12" viewBox="0 0 12 12">
               <path d="M3 5l3 3 3-3" stroke="currentColor" strokeWidth="1.5" fill="none" />
             </svg>
           </button>
-          <a ref={submitBtnRef} href="/submit" className="btn-submit">
+          <a
+            href="/submit"
+            className="btn-submit"
+            ref={submitRef}
+            onMouseEnter={() => submitRef.current && buttonHoverEnter(submitRef.current)}
+            onMouseLeave={() => submitRef.current && buttonHoverLeave(submitRef.current)}
+            onClick={handleSubmitClick}
+          >
             提交
           </a>
           <button
-            ref={menuBtnRef}
             className="btn-menu"
             onClick={() => setMenuOpen(!menuOpen)}
             aria-label="Open menu"

@@ -1,9 +1,17 @@
 import type { Author } from "../data/skills";
+import { cardHoverEnter, cardHoverLeave } from "../animations";
 import "./OfficialAuthors.css";
 
 interface Props {
   authors: Author[];
 }
+
+const handleMouseEnter = (e: React.MouseEvent<HTMLAnchorElement>) => {
+  cardHoverEnter(e.currentTarget);
+};
+const handleMouseLeave = (e: React.MouseEvent<HTMLAnchorElement>) => {
+  cardHoverLeave(e.currentTarget);
+};
 
 export default function OfficialAuthors({ authors }: Props) {
   return (
@@ -20,7 +28,8 @@ export default function OfficialAuthors({ authors }: Props) {
             key={author.slug}
             href={`/author/${author.slug}`}
             className="author-card"
-            data-animate="card"
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
           >
             <span className="author-avatar">{author.avatar}</span>
             <div className="author-info">

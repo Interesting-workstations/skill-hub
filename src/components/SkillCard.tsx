@@ -1,13 +1,27 @@
 import { Link } from "react-router-dom";
-import { useButtonMicro } from "../animations";
+import { useRef } from "react";
+import { cardHoverEnter, cardHoverLeave } from "../animations";
 import "./SkillCard.css";
 import type { Skill } from "../data/skills";
 
 export default function SkillCard({ skill }: { skill: Skill }) {
-  const btnRef = useButtonMicro();
+  const cardRef = useRef<HTMLAnchorElement>(null);
+
+  const handleMouseEnter = () => {
+    if (cardRef.current) cardHoverEnter(cardRef.current);
+  };
+  const handleMouseLeave = () => {
+    if (cardRef.current) cardHoverLeave(cardRef.current);
+  };
 
   return (
-    <Link to={`/skill/${skill.id}`} className="skill-card" data-animate="card">
+    <Link
+      ref={cardRef}
+      to={`/skill/${skill.id}`}
+      className="skill-card"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
       <div className="skill-card-top">
         <div className="skill-card-icon">
           {skill.isOfficial ? "⭐" : "📦"}
@@ -17,7 +31,6 @@ export default function SkillCard({ skill }: { skill: Skill }) {
           <span className="skill-card-author">{skill.author}</span>
         </div>
         <button
-          ref={btnRef}
           className="skill-card-download"
           onClick={(e) => {
             e.preventDefault();

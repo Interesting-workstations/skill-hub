@@ -12,7 +12,7 @@ interface Props {
 export default function SkillSection({ title, count, slug, skills }: Props) {
   return (
     <section className="skill-section">
-      <div className="skill-section-header" data-animate="section-title">
+      <div className="skill-section-header">
         <a href={`/category/${slug}`} className="skill-section-title">
           <h2>{title}</h2>
           <span className="skill-section-count">{count}</span>
