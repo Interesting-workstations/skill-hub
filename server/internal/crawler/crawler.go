@@ -18,6 +18,13 @@ type CrawlOptions struct {
 	PerPage int
 }
 
+// RepoFailure 单个仓库的爬取失败信息。
+type RepoFailure struct {
+	Repo   string `json:"repo"`
+	Reason string `json:"reason"`
+	Error  string `json:"error"`
+}
+
 // DefaultOptions 返回默认爬取选项。
 func DefaultOptions() CrawlOptions {
 	return CrawlOptions{Query: "agent skills", Limit: 20, PerPage: 10}
@@ -25,19 +32,26 @@ func DefaultOptions() CrawlOptions {
 
 // Crawl 执行爬取：先爬取指定仓库，再按关键词搜索补充，最后去重返回技能列表。
 func (c *Client) Crawl(opts CrawlOptions) ([]Skill, error) {
+	skills, _, err := c.CrawlDetailed(opts)
+	return skills, err
+}
+
+// CrawlDetailed 与 Crawl 相同，但额外返回每个仓库的失败信息（供后台监控）。
+func (c *Client) CrawlDetailed(opts CrawlOptions) ([]Skill, []RepoFailure, error) {
 	seen := make(map[string]bool)
 	var skills []Skill
+	var failures []RepoFailure
 
 	// 1. 指定仓库（通常是官方仓库）
 	for _, fullName := range opts.Repos {
 		repo, err := c.GetRepo(fullName)
 		if err != nil {
-			fmt.Printf("  ⚠️ 跳过 %s: %v\n", fullName, err)
+			failures = append(failures, RepoFailure{Repo: fullName, Reason: "获取仓库失败", Error: err.Error()})
 			continue
 		}
 		got, err := c.crawlRepo(repo)
 		if err != nil {
-			fmt.Printf("  ⚠️ 跳过 %s: %v\n", fullName, err)
+			failures = append(failures, RepoFailure{Repo: fullName, Reason: "解析仓库失败", Error: err.Error()})
 			continue
 		}
 		for _, s := range got {
@@ -52,7 +66,7 @@ func (c *Client) Crawl(opts CrawlOptions) ([]Skill, error) {
 	// 2. 搜索结果补充
 	repos, err := c.SearchRepos(opts.Query, opts.PerPage, 1)
 	if err != nil {
-		return nil, fmt.Errorf("搜索仓库失败: %w", err)
+		return nil, failures, fmt.Errorf("搜索仓库失败: %w", err)
 	}
 	if len(repos) > opts.Limit {
 		repos = repos[:opts.Limit]
@@ -60,7 +74,7 @@ func (c *Client) Crawl(opts CrawlOptions) ([]Skill, error) {
 	for _, repo := range repos {
 		got, err := c.crawlRepo(repo)
 		if err != nil {
-			fmt.Printf("  ⚠️ 跳过 %s: %v\n", repo.FullName, err)
+			failures = append(failures, RepoFailure{Repo: repo.FullName, Reason: "解析仓库失败", Error: err.Error()})
 			continue
 		}
 		for _, s := range got {
@@ -73,7 +87,7 @@ func (c *Client) Crawl(opts CrawlOptions) ([]Skill, error) {
 	}
 
 	sort.Slice(skills, func(i, j int) bool { return skills[i].Name < skills[j].Name })
-	return skills, nil
+	return skills, failures, nil
 }
 
 // crawlRepo 解析单个仓库中的 skill。

@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { authApi } from "../../api/auth";
 
 export default function AdminSettingsPage() {
   const [displayName, setDisplayName] = useState("管理员");
@@ -7,6 +8,7 @@ export default function AdminSettingsPage() {
   const [confirmPwd, setConfirmPwd] = useState("");
   const [saved, setSaved] = useState(false);
   const [pwdMsg, setPwdMsg] = useState("");
+  const [pwdSaving, setPwdSaving] = useState(false);
 
   const saveProfile = (e: FormEvent) => {
     e.preventDefault();
@@ -14,18 +16,27 @@ export default function AdminSettingsPage() {
     setTimeout(() => setSaved(false), 2000);
   };
 
-  const savePassword = (e: FormEvent) => {
+  const savePassword = async (e: FormEvent) => {
     e.preventDefault();
     if (newPwd !== confirmPwd) {
       setPwdMsg("两次输入的新密码不一致");
       return;
     }
     setPwdMsg("");
-    setOldPwd("");
-    setNewPwd("");
-    setConfirmPwd("");
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    setPwdSaving(true);
+    try {
+      await authApi.changePassword(oldPwd, newPwd);
+      setPwdMsg("");
+      setOldPwd("");
+      setNewPwd("");
+      setConfirmPwd("");
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (err) {
+      setPwdMsg(err instanceof Error ? err.message : "修改失败");
+    } finally {
+      setPwdSaving(false);
+    }
   };
 
   return (
@@ -71,7 +82,9 @@ export default function AdminSettingsPage() {
         </div>
         {pwdMsg && <div style={{ fontSize: 13, color: "var(--color-danger)" }}>{pwdMsg}</div>}
         <div>
-          <button className="btn btn-primary" type="submit">更新密码</button>
+          <button className="btn btn-primary" type="submit" disabled={pwdSaving}>
+            {pwdSaving ? "提交中…" : "更新密码"}
+          </button>
         </div>
       </form>
 

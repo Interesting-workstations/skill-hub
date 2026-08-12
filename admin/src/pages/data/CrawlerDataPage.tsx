@@ -28,27 +28,22 @@ export default function CrawlerDataPage() {
   }, [filter]);
 
   const filtered = keyword
-    ? data.filter((d) => d.title.toLowerCase().includes(keyword.toLowerCase()))
+    ? data.filter((d) => d.name.toLowerCase().includes(keyword.toLowerCase()))
     : data;
 
   const columns: Column<CrawledDataItem>[] = [
     {
-      key: "title",
+      key: "name",
       title: "标题",
       render: (d) => (
         <div>
           <div style={{ fontWeight: 500 }}>
-            {d.title}
+            {d.name}
             {d.isOfficial && <span className="badge badge-neutral" style={{ marginLeft: 6 }}>官方</span>}
           </div>
           <div style={{ fontSize: 12, color: "var(--color-text-tertiary)" }}>{d.source}</div>
         </div>
       ),
-    },
-    {
-      key: "type",
-      title: "类型",
-      render: (d) => <span className="badge badge-neutral">{d.type}</span>,
     },
     {
       key: "author",
@@ -72,11 +67,6 @@ export default function CrawlerDataPage() {
         const s = STATUS_LABEL[d.status];
         return <span className={`badge ${s.cls}`}>{s.text}</span>;
       },
-    },
-    {
-      key: "fetchedAt",
-      title: "抓取时间",
-      render: (d) => <span className="num">{d.fetchedAt}</span>,
     },
     {
       key: "actions",

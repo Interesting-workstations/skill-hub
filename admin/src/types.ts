@@ -41,6 +41,20 @@ export interface Stats {
   featuredSkills: number;
 }
 
+/** 后台工作台聚合指标（由 Go 后端计算） */
+export interface AdminStats {
+  todayTasks: number;
+  runSuccess: number;
+  runFailed: number;
+  runRunning: number;
+  newData: number;
+  pendingData: number;
+  totalSkills: number;
+  officialSkills: number;
+  totalAuthors: number;
+  totalCategories: number;
+}
+
 /* ---------- 爬虫任务 ---------- */
 export type TaskStatus = "waiting" | "running" | "success" | "failed" | "stopped";
 
@@ -118,20 +132,19 @@ export interface CrawlerConfig {
   enabled: boolean;
 }
 
-/* ---------- 抓取数据（数据管理） ---------- */
+/* ---------- 抓取数据（数据管理，来自 Go 后端 skills 表） ---------- */
 export type DataStatus = "pending" | "approved" | "published" | "ignored";
 
 export interface CrawledDataItem {
   id: string;
-  title: string;
-  source: string;
-  type: string;
-  status: DataStatus;
+  name: string;
   author: string;
   category: string;
   githubStars?: string;
   isOfficial?: boolean;
-  fetchedAt: string;
+  source: string;
+  status: DataStatus;
+  fetchedAt?: string;
 }
 
 /* ---------- 文章 / SEO ---------- */
@@ -159,4 +172,11 @@ export interface SiteConfig {
   portalUrl: string;
   icp: string;
   contactEmail: string;
+}
+
+/* ---------- 管理员 ---------- */
+export interface AdminUser {
+  username: string;
+  displayName: string;
+  role: "admin";
 }

@@ -27,8 +27,6 @@ export default function ArticlePage() {
     await contentApi.createArticle({
       title,
       category,
-      status: "draft",
-      author: "admin",
     });
     setCreateOpen(false);
     setTitle("");

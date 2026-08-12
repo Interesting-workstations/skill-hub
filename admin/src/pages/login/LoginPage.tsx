@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth } from "../../core/auth";
-import { site } from "../../config/site";
+import { authApi } from "../../api/auth";
 import "./LoginPage.css";
 
 export default function LoginPage() {
@@ -11,26 +11,18 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
-    // 模拟认证：单管理员
-    setTimeout(() => {
-      if (
-        username === site.defaultAdmin.username &&
-        password === site.defaultAdmin.password
-      ) {
-        auth.login(
-          `mock-token-${Date.now()}`,
-          { username, displayName: "管理员", role: "admin" },
-        );
-        navigate("/", { replace: true });
-      } else {
-        setError("用户名或密码错误");
-        setLoading(false);
-      }
-    }, 400);
+    try {
+      const result = await authApi.login(username.trim(), password);
+      auth.login(result.token, result.user);
+      navigate("/", { replace: true });
+    } catch {
+      setError("用户名或密码错误");
+      setLoading(false);
+    }
   };
 
   return (
@@ -38,7 +30,7 @@ export default function LoginPage() {
       <div className="login-card">
         <div className="login-brand">
           <div className="login-logo">S</div>
-          <h1>{site.name}</h1>
+          <h1>Agent Skills 运营后台</h1>
           <p>单管理员运营后台 · 官网 / 爬虫 / 数据</p>
         </div>
         <form className="login-form" onSubmit={handleSubmit}>
@@ -68,7 +60,7 @@ export default function LoginPage() {
           </button>
         </form>
         <div className="login-hint">
-          演示账号：admin / admin123
+          账号 admin / 密码 admin123（由 Go 后端校验）
         </div>
       </div>
     </div>

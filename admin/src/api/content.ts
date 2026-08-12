@@ -1,63 +1,44 @@
-/** 内容 / 数据管理 API —— Mock 实现。 */
+/** 内容 / 数据管理 API —— 对接 skill-hub 后端（/api/v1/admin），全部由 Go 提供。 */
 
-import { mockArticles, mockCrawledData, mockSeo, mockSiteConfig } from "../core/mock/content";
+import { http } from "../core/http";
 import type { Article, CrawledDataItem, DataStatus, SeoConfig, SiteConfig } from "../types";
 
-const delay = (ms = 200) => new Promise((r) => setTimeout(r, ms));
-
-let articles: Article[] = [...mockArticles];
-let crawledData: CrawledDataItem[] = [...mockCrawledData];
-let seo: SeoConfig = { ...mockSeo };
-let siteConfig: SiteConfig = { ...mockSiteConfig };
+const base = "/api/v1/admin";
 
 export const contentApi = {
   /* ---- 文章 ---- */
-  async listArticles(): Promise<Article[]> {
-    await delay();
-    return [...articles];
+  listArticles(): Promise<Article[]> {
+    return http.get<Article[]>(`${base}/articles`);
   },
-  async createArticle(input: Omit<Article, "id" | "views" | "updatedAt">): Promise<Article> {
-    await delay();
-    const art: Article = { ...input, id: `art-${Date.now()}`, views: 0, updatedAt: new Date().toISOString().slice(0, 10) };
-    articles = [art, ...articles];
-    return art;
+  createArticle(input: Pick<Article, "title" | "category">): Promise<Article> {
+    return http.post<Article>(`${base}/articles`, input);
   },
-  async deleteArticle(id: string): Promise<void> {
-    await delay();
-    articles = articles.filter((a) => a.id !== id);
+  deleteArticle(id: string): Promise<void> {
+    return http.delete<void>(`${base}/articles/${encodeURIComponent(id)}`);
   },
 
   /* ---- 抓取数据 ---- */
-  async listData(status?: DataStatus): Promise<CrawledDataItem[]> {
-    await delay();
-    return status ? crawledData.filter((d) => d.status === status) : [...crawledData];
+  listData(status?: DataStatus): Promise<CrawledDataItem[]> {
+    return http.get<CrawledDataItem[]>(`${base}/data${status ? `?status=${status}` : ""}`);
   },
-  async updateDataStatus(id: string, status: DataStatus): Promise<void> {
-    await delay();
-    crawledData = crawledData.map((d) => (d.id === id ? { ...d, status } : d));
+  updateDataStatus(id: string, status: DataStatus): Promise<void> {
+    return http.put<void>(`${base}/data/${encodeURIComponent(id)}/status`, { status });
   },
-  async deleteData(id: string): Promise<void> {
-    await delay();
-    crawledData = crawledData.filter((d) => d.id !== id);
+  deleteData(id: string): Promise<void> {
+    return http.delete<void>(`${base}/data/${encodeURIComponent(id)}`);
   },
 
   /* ---- SEO / 站点 ---- */
-  async getSeo(): Promise<SeoConfig> {
-    await delay();
-    return { ...seo };
+  getSeo(): Promise<SeoConfig> {
+    return http.get<SeoConfig>(`${base}/seo`);
   },
-  async saveSeo(patch: Partial<SeoConfig>): Promise<SeoConfig> {
-    await delay();
-    seo = { ...seo, ...patch };
-    return { ...seo };
+  saveSeo(config: SeoConfig): Promise<SeoConfig> {
+    return http.put<SeoConfig>(`${base}/seo`, config);
   },
-  async getSiteConfig(): Promise<SiteConfig> {
-    await delay();
-    return { ...siteConfig };
+  getSiteConfig(): Promise<SiteConfig> {
+    return http.get<SiteConfig>(`${base}/site-config`);
   },
-  async saveSiteConfig(patch: Partial<SiteConfig>): Promise<SiteConfig> {
-    await delay();
-    siteConfig = { ...siteConfig, ...patch };
-    return { ...siteConfig };
+  saveSiteConfig(config: SiteConfig): Promise<SiteConfig> {
+    return http.put<SiteConfig>(`${base}/site-config`, config);
   },
 };

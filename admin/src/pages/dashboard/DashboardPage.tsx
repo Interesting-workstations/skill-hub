@@ -2,14 +2,13 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import StatCard from "../../components/StatCard";
 import TaskStatus from "../../components/TaskStatus";
-import { siteApi } from "../../api/site";
 import { crawlerApi } from "../../api/crawler";
 import { contentApi } from "../../api/content";
-import type { CrawlTask, ExecutionRecord, FailureRecord, CrawledDataItem, Stats } from "../../types";
+import type { AdminStats, ExecutionRecord, FailureRecord, CrawledDataItem } from "../../types";
 import { formatNumber } from "../../utils/format";
 import "./DashboardPage.css";
 
-/** 最近 7 天执行趋势（Mock 数据） */
+/** 最近 7 天执行趋势（演示数据） */
 const TREND = [
   { day: "08-06", count: 18, success: 16 },
   { day: "08-07", count: 21, success: 19 },
@@ -21,24 +20,21 @@ const TREND = [
 ];
 
 export default function DashboardPage() {
-  const [tasks, setTasks] = useState<CrawlTask[]>([]);
   const [executions, setExecutions] = useState<ExecutionRecord[]>([]);
   const [failures, setFailures] = useState<FailureRecord[]>([]);
   const [data, setData] = useState<CrawledDataItem[]>([]);
-  const [stats, setStats] = useState<Stats | null>(null);
+  const [stats, setStats] = useState<AdminStats | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let alive = true;
     Promise.all([
-      crawlerApi.listTasks(),
       crawlerApi.listExecutions(),
       crawlerApi.listFailures(),
       contentApi.listData(),
-      siteApi.stats().catch(() => null),
-    ]).then(([t, e, f, d, s]) => {
+      crawlerApi.stats().catch(() => null),
+    ]).then(([e, f, d, s]) => {
       if (!alive) return;
-      setTasks(t);
       setExecutions(e);
       setFailures(f);
       setData(d);
@@ -58,8 +54,6 @@ export default function DashboardPage() {
     );
   }
 
-  const statusCount = (s: string) => tasks.filter((t) => t.status === s).length;
-  const pending = data.filter((d) => d.status === "pending").length;
   const maxTrend = Math.max(...TREND.map((t) => t.count));
 
   return (
@@ -71,18 +65,18 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* 爬虫核心指标 */}
+      {/* 爬虫核心指标（Go 后端实时统计） */}
       <div className="stat-grid">
-        <StatCard label="今日爬虫任务" value={24} extra="较昨日 +2" extraTone="ok" />
-        <StatCard label="执行成功" value={21} extra="成功率 87.5%" extraTone="ok" />
-        <StatCard label="执行失败" value={2} extra="需处理失败任务" extraTone="bad" />
-        <StatCard label="执行中" value={statusCount("running")} extra="实时监控中" />
+        <StatCard label="爬虫任务" value={stats?.todayTasks ?? 0} extra="全部任务" />
+        <StatCard label="执行成功" value={stats?.runSuccess ?? 0} extra="累计成功记录" extraTone="ok" />
+        <StatCard label="失败记录" value={stats?.runFailed ?? 0} extra="需处理失败任务" extraTone={stats && stats.runFailed > 0 ? "bad" : "ok"} />
+        <StatCard label="执行中" value={stats?.runRunning ?? 0} extra="实时监控中" />
       </div>
       <div className="stat-grid">
-        <StatCard label="新增数据" value={formatNumber(1284)} extra="近 24 小时" />
-        <StatCard label="待审核" value={pending} extra="等待人工审核" />
+        <StatCard label="待审核数据" value={stats?.pendingData ?? 0} extra="等待人工审核" />
         <StatCard label="收录技能" value={stats ? formatNumber(stats.totalSkills) : "--"} extra="官网数据库" />
         <StatCard label="官方技能" value={stats ? formatNumber(stats.officialSkills) : "--"} extra={`${stats?.totalAuthors ?? 0} 位官方作者`} />
+        <StatCard label="官网分类" value={stats ? formatNumber(stats.totalCategories ?? 0) : "--"} extra="官网展示" />
       </div>
 
       {/* 趋势 */}
@@ -141,11 +135,11 @@ export default function DashboardPage() {
           {data.slice(0, 6).map((d) => (
             <div className="dash-list-row" key={d.id}>
               <span className="name">
-                {d.title}
+                {d.name}
                 {d.isOfficial && <span className="badge badge-neutral">官方</span>}
                 <span className="badge badge-neutral">{d.category}</span>
               </span>
-              <span className="time">{d.fetchedAt}</span>
+              <span className="time">{d.source}</span>
             </div>
           ))}
         </div>

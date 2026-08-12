@@ -19,11 +19,11 @@ export default function AuditPage() {
 
   const columns: Column<CrawledDataItem>[] = [
     {
-      key: "title",
+      key: "name",
       title: "数据",
       render: (d) => (
         <div>
-          <div style={{ fontWeight: 500 }}>{d.title}</div>
+          <div style={{ fontWeight: 500 }}>{d.name}</div>
           <div style={{ fontSize: 12, color: "var(--color-text-tertiary)" }}>{d.source}</div>
         </div>
       ),
@@ -42,11 +42,6 @@ export default function AuditPage() {
       key: "stars",
       title: "星标",
       render: (d) => <span className="num">{d.githubStars ?? "--"}</span>,
-    },
-    {
-      key: "fetchedAt",
-      title: "抓取时间",
-      render: (d) => <span className="num">{d.fetchedAt}</span>,
     },
     {
       key: "actions",

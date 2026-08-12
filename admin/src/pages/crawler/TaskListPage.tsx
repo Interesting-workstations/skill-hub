@@ -65,7 +65,7 @@ export default function TaskListPage() {
     if (editing) {
       await crawlerApi.updateTask(editing.id, { name, type, query, schedule });
     } else {
-      await crawlerApi.createTask({ name, type, query, schedule, status: "waiting", lastRunAt: "--", lastDuration: "--" });
+      await crawlerApi.createTask({ name, type, query, schedule });
     }
     setDialogOpen(false);
     await load();

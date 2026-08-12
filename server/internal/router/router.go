@@ -5,14 +5,16 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/Interesting-workstations/skill-hub/server/internal/admin"
 	"github.com/Interesting-workstations/skill-hub/server/internal/middleware"
 	"github.com/Interesting-workstations/skill-hub/server/internal/skill"
 )
 
 // New 构建应用路由：RequestID → Recovery → Logger → CORS → 业务路由。
-func New(svc *skill.Service) http.Handler {
+func New(svc *skill.Service, adminSvc *admin.Service) http.Handler {
 	mux := http.NewServeMux()
 	skill.NewHandler(svc).Register(mux)
+	admin.NewHandler(adminSvc).Register(mux)
 
 	var h http.Handler = mux
 	h = middleware.RequestID(h)

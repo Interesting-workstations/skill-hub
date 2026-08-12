@@ -7,8 +7,8 @@
 
 - React 19 + TypeScript + Vite 8 + react-router-dom v7
 - 原生 CSS Design Tokens（无 UI 库，风格统一、克制）
-- 官网数据对接 skill-hub 后端（`/api/v1`，经 Vite 代理）
-- 爬虫任务模块为 Mock 数据（后端任务 API 尚未实现，接口已预留）
+- **全部数据由 Go 后端提供**（`/api/v1` + `/api/v1/admin`，经 Vite 代理），无 Mock
+- 认证：Bearer Token（登录由后端校验）
 
 ## 快速开始
 
@@ -22,21 +22,42 @@ npm run dev
 # 生产构建
 npm run build
 
-# 演示账号
-admin / admin123
+# 登录账号
+admin / admin123（由 Go 后端 admin_users 表校验）
 ```
 
-> 需先启动 skill-hub 后端（`server/`），官网数据模块才能展示真实数据。
+> 需先启动 skill-hub 后端（`server/`）与 MySQL。爬虫任务执行会真实调用 GitHub API 抓取数据。
 
 ## 模块
 
 | 模块 | 页面 | 数据来源 |
 |---|---|---|
-| 工作台 | 数据概览 / 今日任务 / 爬虫状态 / 最近数据 | 后端 stats + Mock |
-| 爬虫管理 | 爬虫任务 / 执行记录 / 执行详情 / 失败任务 / 爬虫配置 | Mock |
-| 数据管理 | 抓取数据 / 数据审核 / 数据导出 | Mock |
-| 官网内容 | 分类管理 / 首页内容 / 文章管理 / SEO 配置 | 后端 categories/stats/featured + Mock |
-| 系统设置 | 管理员设置 / 网站基础配置 | Mock |
+| 工作台 | 数据概览 / 爬虫状态 / 待审核 | 后端 `/api/v1/admin/stats` |
+| 爬虫管理 | 爬虫任务 / 执行记录 / 执行详情 / 失败任务 / 爬虫配置 | 后端 `/api/v1/admin/*`（真实执行） |
+| 数据管理 | 抓取数据 / 数据审核 / 数据导出 | 后端 `/api/v1/admin/data`（skills 表） |
+| 官网内容 | 分类管理 / 首页内容 / 文章管理 / SEO 配置 | 后端 `/api/v1` + `/api/v1/admin/*` |
+| 系统设置 | 管理员设置 / 网站基础配置 | 后端 `/api/v1/admin/*` |
+
+## 后端接口一览
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/api/v1/admin/login` | 管理员登录（返回 Token） |
+| GET | `/api/v1/admin/stats` | 工作台聚合统计 |
+| GET/POST | `/api/v1/admin/tasks` | 爬虫任务列表 / 新建 |
+| PUT/DELETE | `/api/v1/admin/tasks/{id}` | 更新 / 删除任务 |
+| POST | `/api/v1/admin/tasks/{id}/run` | 执行任务（真实爬虫，异步） |
+| POST | `/api/v1/admin/tasks/{id}/stop` | 停止任务 |
+| GET | `/api/v1/admin/executions` · `/executions/{id}` | 执行记录（轮询详情） |
+| GET | `/api/v1/admin/failures` | 失败任务 |
+| GET/PUT | `/api/v1/admin/config` | 爬虫配置 |
+| GET | `/api/v1/admin/data?status=` | 抓取数据（含审核状态） |
+| PUT | `/api/v1/admin/data/{id}/status` | 数据审核 / 发布 |
+| GET/POST/DELETE | `/api/v1/admin/articles` | 文章管理 |
+| GET/PUT | `/api/v1/admin/seo` · `/site-config` | SEO / 站点配置 |
+| PUT | `/api/v1/admin/password` | 修改密码 |
+
+除登录外均需 `Authorization: Bearer <token>`。
 
 ## 目录结构
 

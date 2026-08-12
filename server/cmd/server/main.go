@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Interesting-workstations/skill-hub/server/internal/admin"
 	"github.com/Interesting-workstations/skill-hub/server/internal/router"
 	"github.com/Interesting-workstations/skill-hub/server/internal/skill"
 )
@@ -28,9 +29,16 @@ func main() {
 	}
 	svc := skill.NewService(repo)
 
+	// 管理后台数据层（MySQL，独立建表 + 种子）
+	adminRepo, err := admin.NewMySQLRepository(dsn)
+	if err != nil {
+		log.Fatalf("初始化后台数据库失败: %v", err)
+	}
+	adminSvc := admin.NewService(adminRepo)
+
 	srv := &http.Server{
 		Addr:         addr,
-		Handler:      router.New(svc),
+		Handler:      router.New(svc, adminSvc),
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
 	}
