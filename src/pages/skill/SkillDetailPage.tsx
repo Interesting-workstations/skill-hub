@@ -1,24 +1,19 @@
 import { useParams, Link } from "react-router-dom";
-import { useEffect, useRef, useCallback } from "react";
-import { getAllSkills } from "../data/skills";
-import SkillCard from "../components/SkillCard";
-import {
-  pageEnter,
-  createAnimationContext,
-  sectionEnter,
-  buttonClick,
-  panelEnterRight,
-} from "../animations";
+import { useRef, useCallback } from "react";
+import { getAllSkills } from "../../data/queries";
+import SkillCard from "../../components/skill/SkillCard";
+import { sectionEnter, buttonClick, panelEnterRight } from "../../animations";
+import { usePageAnimation } from "../../hooks/usePageAnimation";
+import { usePageMeta } from "../../hooks/usePageMeta";
+import { site } from "../../config/site";
 import "./SkillDetailPage.css";
 
 export default function SkillDetailPage() {
   const { skillId } = useParams<{ skillId: string }>();
   const allSkills = getAllSkills();
   const skill = allSkills.find((s) => s.id === skillId);
-  const pageRef = useRef<HTMLDivElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
   const copyBtnRef = useRef<HTMLButtonElement>(null);
-  const ctx = useRef(createAnimationContext());
 
   const handleCopy = useCallback(() => {
     if (skill?.installCommand) {
@@ -29,31 +24,22 @@ export default function SkillDetailPage() {
     }
   }, [skill]);
 
-  useEffect(() => {
-    if (!pageRef.current) return;
-    ctx.current.killAll();
-
-    // 页面进入
-    const tl = pageEnter(pageRef.current);
-    ctx.current.add(tl);
-
+  const pageRef = usePageAnimation((container, ctx) => {
     // 内容区块 stagger
-    const sections = pageRef.current.querySelectorAll(".detail-section");
+    const sections = container.querySelectorAll(".detail-section");
     if (sections.length > 0) {
-      const st = sectionEnter(sections, { fromY: 12 });
-      ctx.current.add(st);
+      ctx.add(sectionEnter(sections, { fromY: 12 }));
     }
-
     // 侧边栏面板滑入
     if (sidebarRef.current) {
-      const panel = panelEnterRight(sidebarRef.current);
-      ctx.current.add(panel);
+      ctx.add(panelEnterRight(sidebarRef.current));
     }
-
-    return () => {
-      ctx.current.killAll();
-    };
   }, [skillId]);
+
+  usePageMeta({
+    title: skill ? `${skill.name} — ${site.name}` : site.title,
+    description: skill?.description,
+  });
 
   if (!skill) {
     return (

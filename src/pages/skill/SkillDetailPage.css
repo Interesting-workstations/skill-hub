@@ -10,21 +10,21 @@
   align-items: center;
   gap: 8px;
   font-size: 13px;
-  color: #9ca3af;
+  color: var(--color-text-muted);
   margin-bottom: 28px;
 }
 
 .detail-breadcrumb a {
-  color: #6b7280;
+  color: var(--color-text-secondary);
   text-decoration: none;
 }
 
 .detail-breadcrumb a:hover {
-  color: #7c3aed;
+  color: var(--color-primary);
 }
 
 .detail-breadcrumb span {
-  color: #111827;
+  color: var(--color-text);
   font-weight: 500;
 }
 
@@ -66,25 +66,25 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f5f3ff;
+  background: var(--color-primary-50);
   border-radius: 12px;
 }
 
 .detail-meta h1 {
   font-size: 28px;
   font-weight: 800;
-  color: #111827;
+  color: var(--color-text);
   margin: 0 0 4px;
   line-height: 1.2;
 }
 
 .detail-author {
   font-size: 14px;
-  color: #6b7280;
+  color: var(--color-text-secondary);
 }
 
 .detail-author a {
-  color: #7c3aed;
+  color: var(--color-primary);
   font-weight: 500;
 }
 
@@ -94,7 +94,7 @@
 
 .detail-desc {
   font-size: 16px;
-  color: #4b5563;
+  color: var(--color-text-subtle);
   line-height: 1.7;
   margin: 0 0 20px;
 }
@@ -105,10 +105,10 @@
   align-items: center;
   gap: 0;
   margin-bottom: 16px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--color-border-input);
   border-radius: 10px;
   overflow: hidden;
-  background: #f9fafb;
+  background: var(--color-surface-code);
 }
 
 .detail-install code {
@@ -116,7 +116,7 @@
   padding: 12px 16px;
   font-size: 13px;
   font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
-  color: #374151;
+  color: var(--color-text-label);
   overflow-x: auto;
   white-space: nowrap;
 }
@@ -128,16 +128,16 @@
   width: 44px;
   align-self: stretch;
   border: none;
-  background: #f3f4f6;
-  color: #6b7280;
+  background: var(--color-surface-hover);
+  color: var(--color-text-secondary);
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
   flex-shrink: 0;
 }
 
 .btn-copy:hover {
-  background: #e5e7eb;
-  color: #111827;
+  background: var(--color-border);
+  color: var(--color-text);
 }
 
 /* Action buttons */
@@ -161,21 +161,21 @@
 }
 
 .btn-download {
-  background: #7c3aed;
-  color: white;
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
 }
 
 .btn-download:hover {
-  background: #6d28d9;
+  background: var(--color-primary-hover);
 }
 
 .btn-github {
-  background: #111827;
-  color: white;
+  background: var(--color-text);
+  color: var(--color-text-inverse);
 }
 
 .btn-github:hover {
-  background: #1f2937;
+  background: var(--color-github-dark);
 }
 
 /* Content sections */
@@ -186,14 +186,14 @@
 .detail-section h2 {
   font-size: 20px;
   font-weight: 700;
-  color: #111827;
+  color: var(--color-text);
   margin: 0 0 12px;
   line-height: 1.4;
 }
 
 .detail-section p {
   font-size: 15px;
-  color: #4b5563;
+  color: var(--color-text-subtle);
   line-height: 1.75;
   margin: 0 0 10px;
 }
@@ -209,8 +209,8 @@
 .detail-tag {
   display: inline-block;
   padding: 5px 14px;
-  background: #f3f4f6;
-  color: #6b7280;
+  background: var(--color-surface-hover);
+  color: var(--color-text-secondary);
   font-size: 12px;
   border-radius: 20px;
   text-decoration: none;
@@ -218,14 +218,14 @@
 }
 
 .detail-tag:hover {
-  background: #7c3aed;
-  color: white;
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
 }
 
 /* License */
 .detail-license {
   font-size: 13px;
-  color: #9ca3af;
+  color: var(--color-text-muted);
   margin-top: 8px;
 }
 
@@ -238,7 +238,7 @@
 
 .sidebar-ad {
   padding: 20px;
-  border: 1px dashed #d1d5db;
+  border: 1px dashed var(--color-border-input);
   border-radius: 12px;
   text-align: center;
   margin-bottom: 28px;
@@ -246,18 +246,18 @@
 
 .sidebar-ad-text {
   font-size: 14px;
-  color: #9ca3af;
+  color: var(--color-text-muted);
   margin: 0;
 }
 
 .sidebar-ad-text a {
-  color: #7c3aed;
+  color: var(--color-primary);
 }
 
 .sidebar-more h3 {
   font-size: 16px;
   font-weight: 600;
-  color: #111827;
+  color: var(--color-text);
   margin: 0 0 12px;
 }
 
@@ -281,6 +281,6 @@
 }
 
 .detail-not-found a {
-  color: #7c3aed;
+  color: var(--color-primary);
   font-weight: 500;
 }
