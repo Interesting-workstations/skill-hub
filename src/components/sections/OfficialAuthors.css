@@ -18,19 +18,19 @@
 }
 
 .official-title-link:hover {
-  color: #7c3aed;
+  color: var(--color-primary);
 }
 
 .official-title {
   font-size: 22px;
   font-weight: 700;
-  color: #111827;
+  color: var(--color-text);
   margin: 0;
 }
 
 .official-arrow {
   font-size: 18px;
-  color: #9ca3af;
+  color: var(--color-text-muted);
 }
 
 .official-grid {
@@ -44,16 +44,16 @@
   align-items: center;
   gap: 12px;
   padding: 16px 18px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--color-border);
   border-radius: 12px;
   text-decoration: none;
   color: inherit;
   transition: border-color 0.2s, box-shadow 0.2s;
-  background: white;
+  background: var(--color-surface);
 }
 
 .author-card:hover {
-  border-color: #c4b5fd;
+  border-color: var(--color-primary-200);
   box-shadow: 0 4px 20px rgba(124, 58, 237, 0.06);
 }
 
@@ -65,7 +65,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f5f3ff;
+  background: var(--color-primary-50);
   border-radius: 10px;
 }
 
@@ -76,7 +76,7 @@
 .author-name {
   font-size: 14px;
   font-weight: 600;
-  color: #111827;
+  color: var(--color-text);
   margin: 0 0 2px;
   white-space: nowrap;
   overflow: hidden;
@@ -85,7 +85,7 @@
 
 .author-count {
   font-size: 12px;
-  color: #9ca3af;
+  color: var(--color-text-muted);
   margin: 0;
 }
 

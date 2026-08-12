@@ -1,8 +1,8 @@
 import { Link } from "react-router-dom";
 import { useRef } from "react";
-import { cardHoverEnter, cardHoverLeave } from "../animations";
+import { cardHoverEnter, cardHoverLeave } from "../../animations";
 import "./SkillCard.css";
-import type { Skill } from "../data/skills";
+import type { Skill } from "../../data/types";
 
 export default function SkillCard({ skill }: { skill: Skill }) {
   const cardRef = useRef<HTMLAnchorElement>(null);

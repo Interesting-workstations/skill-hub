@@ -1,5 +1,5 @@
-import SkillCard from "./SkillCard";
-import type { Skill } from "../data/skills";
+import SkillCard from "../skill/SkillCard";
+import type { Skill } from "../../data/types";
 import "./SkillSection.css";
 
 interface Props {

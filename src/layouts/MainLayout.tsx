@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
-import Navbar from "./Navbar";
-import Footer from "./Footer";
+import Navbar from "../components/layout/Navbar";
+import Footer from "../components/layout/Footer";
+import ScrollToTop from "../components/layout/ScrollToTop";
 import { createAnimationContext } from "../animations";
 
-export default function Layout() {
+export default function MainLayout() {
   const location = useLocation();
   const mainRef = useRef<HTMLElement>(null);
   const ctx = useRef(createAnimationContext());
@@ -29,6 +30,7 @@ export default function Layout() {
 
   return (
     <>
+      <ScrollToTop />
       <Navbar />
       <main
         className="main"

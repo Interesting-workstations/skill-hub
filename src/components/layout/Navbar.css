@@ -4,7 +4,7 @@
   z-index: 100;
   background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(12px);
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .navbar-inner {
@@ -32,7 +32,7 @@
 .logo-text {
   font-size: 18px;
   font-weight: 700;
-  color: #111827;
+  color: var(--color-text);
 }
 
 .navbar-actions {
@@ -46,23 +46,23 @@
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--color-border-input);
   border-radius: 8px;
-  background: white;
+  background: var(--color-surface);
   font-size: 13px;
-  color: #374151;
+  color: var(--color-text-label);
   cursor: pointer;
   transition: border-color 0.2s;
 }
 
 .btn-lang:hover {
-  border-color: #9ca3af;
+  border-color: var(--color-text-muted);
 }
 
 .btn-submit {
   padding: 8px 18px;
-  background: #7c3aed;
-  color: white;
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
   border-radius: 8px;
   text-decoration: none;
   font-size: 14px;
@@ -71,7 +71,7 @@
 }
 
 .btn-submit:hover {
-  background: #6d28d9;
+  background: var(--color-primary-hover);
 }
 
 .btn-menu {
@@ -81,13 +81,38 @@
   padding: 8px;
   border: none;
   background: transparent;
-  color: #374151;
+  color: var(--color-text-label);
   cursor: pointer;
   border-radius: 8px;
 }
 
 .btn-menu:hover {
-  background: #f3f4f6;
+  background: var(--color-surface-hover);
+}
+
+/* 移动端下拉菜单 */
+.navbar-menu {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 24px 16px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.navbar-menu-link {
+  padding: 11px 0;
+  font-size: 15px;
+  color: var(--color-text);
+  text-decoration: none;
+  border-bottom: 1px solid var(--color-surface-hover);
+}
+
+.navbar-menu-link:last-child {
+  border-bottom: none;
+}
+
+.navbar-menu-link:hover {
+  color: var(--color-primary);
 }
 
 @media (max-width: 640px) {

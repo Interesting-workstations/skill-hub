@@ -1,5 +1,6 @@
-import type { Author } from "../data/skills";
-import { cardHoverEnter, cardHoverLeave } from "../animations";
+import { Link } from "react-router-dom";
+import type { Author } from "../../data/types";
+import { cardHoverEnter, cardHoverLeave } from "../../animations";
 import "./OfficialAuthors.css";
 
 interface Props {
@@ -17,16 +18,16 @@ export default function OfficialAuthors({ authors }: Props) {
   return (
     <section className="official-section">
       <div className="official-header">
-        <a href="/official" className="official-title-link">
+        <Link to="/official" className="official-title-link">
           <h2 className="official-title">官方技能</h2>
           <span className="official-arrow">→</span>
-        </a>
+        </Link>
       </div>
       <div className="official-grid">
         {authors.map((author) => (
-          <a
+          <Link
             key={author.slug}
-            href={`/author/${author.slug}`}
+            to={`/author/${author.slug}`}
             className="author-card"
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
@@ -36,7 +37,7 @@ export default function OfficialAuthors({ authors }: Props) {
               <h3 className="author-name">{author.name}</h3>
               <p className="author-count">{author.skillCount} 个技能</p>
             </div>
-          </a>
+          </Link>
         ))}
       </div>
     </section>
