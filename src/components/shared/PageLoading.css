@@ -1,0 +1,147 @@
+/* 全局品牌加载指示器 */
+
+.page-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  min-height: 100vh;
+  padding: 24px;
+  background: var(--color-surface);
+}
+
+/* ── 品牌 logo：整体柔和浮动 ── */
+.page-loading-logo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: var(--color-primary);
+  box-shadow: 0 8px 24px rgba(124, 58, 237, 0.25);
+  animation: page-loading-float 2.4s ease-in-out infinite;
+}
+
+/* 三条横线：逐条点亮（呼应 logo 的"技能/指令"意象） */
+.page-loading-logo-line {
+  width: 24px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--color-text-inverse);
+  opacity: 0.25;
+  animation: page-loading-line 1.4s ease-in-out infinite;
+}
+
+.page-loading-logo-line:nth-child(2) {
+  animation-delay: 0.18s;
+}
+
+.page-loading-logo-line:nth-child(3) {
+  animation-delay: 0.36s;
+}
+
+@keyframes page-loading-line {
+  0%,
+  60%,
+  100% {
+    opacity: 0.25;
+    transform: scaleX(0.75);
+  }
+  30% {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+}
+
+@keyframes page-loading-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+/* ── 品牌文字：渐变紫，优雅淡入 ── */
+.page-loading-brand {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  background: linear-gradient(
+    135deg,
+    var(--color-primary),
+    var(--color-primary-300)
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: page-loading-fade 1.2s ease both;
+}
+
+@keyframes page-loading-fade {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── 三个加载点 ── */
+.page-loading-dots {
+  display: flex;
+  gap: 7px;
+}
+
+.page-loading-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  animation: page-loading-dot 1.2s ease-in-out infinite;
+}
+
+.page-loading-dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.page-loading-dot:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes page-loading-dot {
+  0%,
+  60%,
+  100% {
+    transform: scale(0.6);
+    opacity: 0.35;
+  }
+  30% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* ── 用户偏好减少动态：静帧显示 ── */
+@media (prefers-reduced-motion: reduce) {
+  .page-loading-logo,
+  .page-loading-logo-line,
+  .page-loading-brand,
+  .page-loading-dot {
+    animation: none;
+  }
+
+  .page-loading-logo-line,
+  .page-loading-brand,
+  .page-loading-dot {
+    opacity: 1;
+    transform: none;
+  }
+}

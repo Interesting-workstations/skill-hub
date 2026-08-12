@@ -1,23 +1,28 @@
+import { Suspense } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Layout from "./components/Layout";
-import HomePage from "./pages/HomePage";
-import SkillDetailPage from "./pages/SkillDetailPage";
-import AuthorPage from "./pages/AuthorPage";
+import ErrorBoundary from "./app/ErrorBoundary";
+import MainLayout from "./layouts/MainLayout";
+import PageLoading from "./components/shared/PageLoading";
+import { routes } from "./app/router/routes";
 import "./App.css";
 
 function App() {
   return (
-    <BrowserRouter>
-      <div className="app">
-        <Routes>
-          <Route element={<Layout />}>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/skill/:skillId" element={<SkillDetailPage />} />
-            <Route path="/author/:authorSlug" element={<AuthorPage />} />
-          </Route>
-        </Routes>
-      </div>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <div className="app">
+          <Suspense fallback={<PageLoading />}>
+            <Routes>
+              <Route element={<MainLayout />}>
+                {routes.map((route) => (
+                  <Route key={route.path} path={route.path} element={route.element} />
+                ))}
+              </Route>
+            </Routes>
+          </Suspense>
+        </div>
+      </BrowserRouter>
+    </ErrorBoundary>
   );
 }
 
