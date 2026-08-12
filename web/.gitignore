@@ -12,6 +12,11 @@ dist
 dist-ssr
 *.local
 
+# Vite 缓存与 TS 增量编译
+.vite
+*.tsbuildinfo
+node_modules/.tmp
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
