@@ -1,0 +1,138 @@
+import { useEffect, useState } from "react";
+import AppTable, { type Column } from "../../components/AppTable";
+import { contentApi } from "../../api/content";
+import type { CrawledDataItem, DataStatus } from "../../types";
+
+const STATUS_LABEL: Record<DataStatus, { text: string; cls: string }> = {
+  pending: { text: "待审核", cls: "badge-warning" },
+  approved: { text: "已审核", cls: "badge-running" },
+  published: { text: "已发布", cls: "badge-success" },
+  ignored: { text: "已忽略", cls: "badge-neutral" },
+};
+
+export default function CrawlerDataPage() {
+  const [data, setData] = useState<CrawledDataItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<DataStatus | "">("");
+  const [keyword, setKeyword] = useState("");
+
+  const load = async () => {
+    setLoading(true);
+    const list = await contentApi.listData(filter || undefined);
+    setData(list);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    void load();
+  }, [filter]);
+
+  const filtered = keyword
+    ? data.filter((d) => d.title.toLowerCase().includes(keyword.toLowerCase()))
+    : data;
+
+  const columns: Column<CrawledDataItem>[] = [
+    {
+      key: "title",
+      title: "标题",
+      render: (d) => (
+        <div>
+          <div style={{ fontWeight: 500 }}>
+            {d.title}
+            {d.isOfficial && <span className="badge badge-neutral" style={{ marginLeft: 6 }}>官方</span>}
+          </div>
+          <div style={{ fontSize: 12, color: "var(--color-text-tertiary)" }}>{d.source}</div>
+        </div>
+      ),
+    },
+    {
+      key: "type",
+      title: "类型",
+      render: (d) => <span className="badge badge-neutral">{d.type}</span>,
+    },
+    {
+      key: "author",
+      title: "作者",
+      render: (d) => <span>{d.author}</span>,
+    },
+    {
+      key: "category",
+      title: "分类",
+      render: (d) => <span className="badge badge-neutral">{d.category}</span>,
+    },
+    {
+      key: "stars",
+      title: "星标",
+      render: (d) => <span className="num">{d.githubStars ?? "--"}</span>,
+    },
+    {
+      key: "status",
+      title: "状态",
+      render: (d) => {
+        const s = STATUS_LABEL[d.status];
+        return <span className={`badge ${s.cls}`}>{s.text}</span>;
+      },
+    },
+    {
+      key: "fetchedAt",
+      title: "抓取时间",
+      render: (d) => <span className="num">{d.fetchedAt}</span>,
+    },
+    {
+      key: "actions",
+      title: "操作",
+      width: "200px",
+      render: (d) => (
+        <div style={{ display: "flex", gap: 4 }}>
+          {d.status === "pending" && (
+            <>
+              <button className="btn-link" onClick={() => contentApi.updateDataStatus(d.id, "approved").then(load)}>审核通过</button>
+              <button className="btn-link danger" onClick={() => contentApi.updateDataStatus(d.id, "ignored").then(load)}>忽略</button>
+            </>
+          )}
+          {d.status === "approved" && (
+            <button className="btn-link" onClick={() => contentApi.updateDataStatus(d.id, "published").then(load)}>发布</button>
+          )}
+          <button className="btn-link danger" onClick={() => contentApi.deleteData(d.id).then(load)}>删除</button>
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <div className="page">
+      <div className="page-header">
+        <div>
+          <h1>抓取数据</h1>
+          <div className="sub">爬虫抓取到的全部数据，审核后发布到官网</div>
+        </div>
+      </div>
+
+      <AppTable
+        columns={columns}
+        data={filtered}
+        rowKey={(d) => d.id}
+        loading={loading}
+        pageSize={10}
+        toolbar={
+          <div className="filters">
+            <input
+              className="input"
+              placeholder="搜索标题"
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              style={{ width: 200 }}
+            />
+            <select className="select" value={filter} onChange={(e) => setFilter(e.target.value as DataStatus | "")}>
+              <option value="">全部状态</option>
+              <option value="pending">待审核</option>
+              <option value="approved">已审核</option>
+              <option value="published">已发布</option>
+              <option value="ignored">已忽略</option>
+            </select>
+          </div>
+        }
+      />
+    </div>
+  );
+}

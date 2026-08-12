@@ -1,0 +1,132 @@
+/** 内容 / 数据管理 Mock 数据。 */
+
+import type { Article, CrawledDataItem, SeoConfig, SiteConfig } from "../../types";
+
+export const mockArticles: Article[] = [
+  {
+    id: "art-1",
+    title: "什么是 Agent Skills？",
+    status: "published",
+    category: "教程",
+    author: "admin",
+    views: 1284,
+    updatedAt: "2026-08-11",
+  },
+  {
+    id: "art-2",
+    title: "Claude Code 官方技能入门",
+    status: "published",
+    category: "官方",
+    author: "admin",
+    views: 863,
+    updatedAt: "2026-08-09",
+  },
+  {
+    id: "art-3",
+    title: "如何编写自己的 SKILL.md",
+    status: "draft",
+    category: "教程",
+    author: "admin",
+    views: 0,
+    updatedAt: "2026-08-12",
+  },
+  {
+    id: "art-4",
+    title: "技能精选规则说明",
+    status: "published",
+    category: "公告",
+    author: "admin",
+    views: 356,
+    updatedAt: "2026-08-07",
+  },
+];
+
+export const mockCrawledData: CrawledDataItem[] = [
+  {
+    id: "sk-1",
+    title: "algorithmic-art",
+    source: "github.com/anthropics/skills",
+    type: "skill",
+    status: "published",
+    author: "anthropics",
+    category: "creative",
+    githubStars: "168.4k",
+    isOfficial: true,
+    fetchedAt: "2026-08-12 02:02:10",
+  },
+  {
+    id: "sk-2",
+    title: "frontend-design",
+    source: "github.com/anthropics/skills",
+    type: "skill",
+    status: "published",
+    author: "anthropics",
+    category: "creative",
+    githubStars: "168.4k",
+    isOfficial: true,
+    fetchedAt: "2026-08-12 02:02:15",
+  },
+  {
+    id: "sk-3",
+    title: "docx",
+    source: "github.com/anthropics/skills",
+    type: "skill",
+    status: "approved",
+    author: "anthropics",
+    category: "document",
+    githubStars: "168.4k",
+    isOfficial: true,
+    fetchedAt: "2026-08-12 02:02:18",
+  },
+  {
+    id: "sk-4",
+    title: "community-skill-pack",
+    source: "github.com/community/skills",
+    type: "skill",
+    status: "pending",
+    author: "community",
+    category: "development",
+    githubStars: "1.2k",
+    isOfficial: false,
+    fetchedAt: "2026-08-12 18:02:30",
+  },
+  {
+    id: "sk-5",
+    title: "browser-automation-kit",
+    source: "github.com/example/browser-tools",
+    type: "skill",
+    status: "pending",
+    author: "example",
+    category: "browser-automation",
+    githubStars: "320",
+    isOfficial: false,
+    fetchedAt: "2026-08-12 18:03:40",
+  },
+  {
+    id: "sk-6",
+    title: "old-duplicate-skill",
+    source: "github.com/old/repo",
+    type: "skill",
+    status: "ignored",
+    author: "old",
+    category: "development",
+    githubStars: "45",
+    isOfficial: false,
+    fetchedAt: "2026-08-10 09:00:00",
+  },
+];
+
+export const mockSeo: SeoConfig = {
+  title: "Agent Skills 资源库 — AI 编程助手的可复用技能",
+  description: "发现适用于 Claude Code、Codex 等 AI 编程助手的可复用技能。",
+  keywords: "agent skills, claude code, AI 编程助手, 技能库",
+  ogImage: "https://example.com/og-cover.png",
+};
+
+export const mockSiteConfig: SiteConfig = {
+  siteName: "Agent Skills 资源库",
+  slogan: "AI 编程助手的可复用技能",
+  portalUrl: "http://localhost:5173",
+  icp: "京ICP备00000000号",
+  contactEmail: "admin@example.com",
+};

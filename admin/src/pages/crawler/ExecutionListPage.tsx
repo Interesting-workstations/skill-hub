@@ -1,0 +1,99 @@
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import AppTable, { type Column } from "../../components/AppTable";
+import TaskStatus from "../../components/TaskStatus";
+import { crawlerApi } from "../../api/crawler";
+import type { ExecutionRecord } from "../../types";
+
+export default function ExecutionListPage() {
+  const [records, setRecords] = useState<ExecutionRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    crawlerApi.listExecutions().then((r) => {
+      setRecords(r);
+      setLoading(false);
+    });
+  }, []);
+
+  const columns: Column<ExecutionRecord>[] = [
+    {
+      key: "taskName",
+      title: "任务",
+      render: (e) => (
+        <Link to={`/crawler/executions/${e.id}`} style={{ fontWeight: 500 }}>
+          {e.taskName}
+        </Link>
+      ),
+    },
+    {
+      key: "status",
+      title: "状态",
+      render: (e) => <TaskStatus status={e.status} />,
+    },
+    {
+      key: "startTime",
+      title: "开始时间",
+      render: (e) => <span className="num">{e.startTime}</span>,
+    },
+    {
+      key: "duration",
+      title: "耗时",
+      render: (e) => <span className="num">{e.duration}</span>,
+    },
+    {
+      key: "progress",
+      title: "进度",
+      render: (e) => {
+        const cls = e.status === "success" ? "success" : e.status === "failed" ? "danger" : "normal";
+        return (
+          <div style={{ width: 180 }}>
+            <div className="progress">
+              <div className="progress-track">
+                <div
+                  className={`progress-bar ${cls === "success" ? "success" : cls === "danger" ? "danger" : ""}`}
+                  style={{ width: `${e.progress}%` }}
+                />
+              </div>
+              <span className="progress-text">{e.progress}%</span>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      key: "stats",
+      title: "结果",
+      render: (e) => (
+        <div style={{ fontSize: 13 }}>
+          抓取 {e.stats.pages} · 新增 {e.stats.newData}
+        </div>
+      ),
+    },
+    {
+      key: "action",
+      title: "操作",
+      render: (e) => (
+        <Link to={`/crawler/executions/${e.id}`} className="btn-link">查看详情</Link>
+      ),
+    },
+  ];
+
+  return (
+    <div className="page">
+      <div className="page-header">
+        <div>
+          <h1>执行记录</h1>
+          <div className="sub">查看每次爬虫执行的进度、结果与日志</div>
+        </div>
+      </div>
+      <AppTable
+        columns={columns}
+        data={records}
+        rowKey={(e) => e.id}
+        loading={loading}
+        pageSize={10}
+      />
+    </div>
+  );
+}

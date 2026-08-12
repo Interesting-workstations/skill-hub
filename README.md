@@ -1,45 +1,60 @@
 # Agent Skills 资源库
 
-> AI 编程助手的可复用技能资源库 —— 前端官网与后端 API 的 Monorepo 项目。
+> AI 编程助手的可复用技能资源库 —— 官网 + 后端 API + 运营后台的 Monorepo 项目。
 
 ## 📁 项目结构
 
-前端与后端为两个**平级目录**，共同组成一个 Git 仓库：
+三个子项目为**平级目录**，共同组成一个 Git 仓库：
 
 ```
 skill-hub/
-├── web/          # 前端（React 19 + Vite + TypeScript + GSAP）
-├── server/       # 后端（Go 模块化单体 REST API）
+├── web/          # 前端官网（React 19 + Vite + TypeScript + GSAP）
+├── server/       # 后端（Go 模块化单体 REST API + MySQL + 爬虫）
+├── admin/        # 运营后台（React 19 + Vite + TypeScript，单管理员）
 └── README.md     # 本文件（仓库总览）
 ```
 
 | 子项目 | 说明 | 详细文档 |
 |---|---|---|
 | `web/` | 技能资源库官网（页面/组件/设计令牌/SEO） | [web/README.md](web/README.md) |
-| `server/` | 技能数据 REST API（分层架构/统一响应） | [server/README.md](server/README.md) |
+| `server/` | 技能数据 REST API（分层架构/统一响应/MySQL/爬虫） | [server/README.md](server/README.md) |
+| `admin/` | 单管理员运营后台（工作台/爬虫管理/数据管理/官网内容） | [admin/README.md](admin/README.md) |
 
 ## 🚀 快速开始
 
-前后端需要分别启动，前端通过 `http://localhost:8080/api/v1` 调用后端。
+三个服务需要分别启动。前端官网与运营后台通过 `http://localhost:8080/api/v1` 调用后端。
 
 ```bash
-# 1. 启动后端（:8080）
+# 1. 启动 MySQL（Docker，首次）
+docker run -d --name skillhub-mysql \
+  -e MYSQL_ROOT_PASSWORD=root -e MYSQL_DATABASE=skillhub \
+  -p 3306:3306 mysql:8.0
+
+# 2. 启动后端（:8080）
 cd server
 go run ./cmd/server
 
-# 2. 启动前端（:5173）
+# 3. 启动官网（:5173）
 cd web
 npm install        # 首次
 npm run dev
+
+# 4. 启动运营后台（:5174）
+cd admin
+npm install        # 首次
+npm run dev
 ```
+
+> 运营后台演示账号：`admin / admin123`（爬虫任务模块为 Mock 数据，官网数据对接真实后端）。
 
 ## 🛠️ 常用命令
 
 | 位置 | 命令 | 说明 |
 |---|---|---|
-| `web/` | `npm run dev` | 前端开发服务器（:5173） |
-| `web/` | `npm run build` | 前端类型检查 + 生产构建 |
-| `web/` | `npm run lint` | 前端 oxlint |
+| `web/` | `npm run dev` | 官网开发服务器（:5173） |
+| `web/` | `npm run build` | 官网类型检查 + 生产构建 |
+| `admin/` | `npm run dev` | 运营后台开发服务器（:5174） |
+| `admin/` | `npm run build` | 运营后台类型检查 + 生产构建 |
 | `server/` | `go run ./cmd/server` | 启动后端（:8080） |
 | `server/` | `go test ./...` | 后端单元测试 |
 

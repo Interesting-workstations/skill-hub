@@ -1,0 +1,56 @@
+/* Agent Skills 运营后台 —— Design Tokens */
+:root {
+  /* 背景与表面 */
+  --bg-page: #f5f6f8;
+  --bg-card: #ffffff;
+  --bg-sidebar: #1d232e;
+  --bg-sidebar-hover: rgba(255, 255, 255, 0.06);
+  --bg-active: rgba(79, 110, 247, 0.14);
+  --bg-hover: #f2f3f5;
+  --bg-muted: #f7f8fa;
+
+  /* 品牌色 */
+  --color-primary: #4f6ef7;
+  --color-primary-hover: #3d5be0;
+  --color-primary-soft: rgba(79, 110, 247, 0.1);
+
+  /* 语义状态色（统一） */
+  --color-success: #00b42a;
+  --color-success-soft: rgba(0, 180, 42, 0.1);
+  --color-danger: #f53f3f;
+  --color-danger-soft: rgba(245, 63, 63, 0.1);
+  --color-warning: #ff7d00;
+  --color-warning-soft: rgba(255, 125, 0, 0.12);
+  --color-running: #165dff;
+  --color-running-soft: rgba(22, 93, 255, 0.1);
+  --color-waiting: #86909c;
+  --color-waiting-soft: rgba(134, 144, 156, 0.14);
+  --color-stopped: #4e5969;
+
+  /* 文本 */
+  --color-text: #1f2329;
+  --color-text-secondary: #4e5969;
+  --color-text-tertiary: #86909c;
+  --color-text-inverse: #ffffff;
+
+  /* 边框 */
+  --color-border: #e5e6eb;
+  --color-border-light: #f0f1f3;
+
+  /* 圆角 / 阴影 */
+  --radius: 6px;
+  --radius-sm: 4px;
+  --radius-lg: 10px;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-pop: 0 4px 16px rgba(0, 0, 0, 0.1);
+
+  /* 布局 */
+  --sidebar-width: 220px;
+  --header-height: 56px;
+
+  /* 字体 */
+  --font:
+    -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB",
+    "Microsoft YaHei", "Segoe UI", sans-serif;
+  --font-mono: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+}
