@@ -2,11 +2,13 @@ import { Link } from "react-router-dom";
 import { useRef } from "react";
 import { cardHoverEnter, cardHoverLeave } from "../../animations";
 import { skillDownloadUrl } from "../../services/api/skills";
+import { useI18n } from "../../i18n";
 import "./SkillCard.css";
 import type { Skill } from "../../data/types";
 
 export default function SkillCard({ skill }: { skill: Skill }) {
   const cardRef = useRef<HTMLAnchorElement>(null);
+  const { t } = useI18n();
 
   const handleMouseEnter = () => {
     if (cardRef.current) cardHoverEnter(cardRef.current);
@@ -53,7 +55,7 @@ export default function SkillCard({ skill }: { skill: Skill }) {
         <button
           className="skill-card-download"
           onClick={handleDownload}
-          title="下载 ZIP"
+          title={t("card.download")}
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <path

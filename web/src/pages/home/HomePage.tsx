@@ -6,10 +6,11 @@ import { useAuthors, useCategories, useSkills } from "../../hooks/useSkillData";
 import { usePageAnimation } from "../../hooks/usePageAnimation";
 import { usePageMeta } from "../../hooks/usePageMeta";
 import PageLoading from "../../components/shared/PageLoading";
-import { site } from "../../config/site";
+import { useI18n } from "../../i18n";
 
 export default function HomePage() {
-  usePageMeta({ title: site.title, description: site.description });
+  const { t } = useI18n();
+  usePageMeta({ title: t("brand.title"), description: t("brand.description") });
   const pageRef = usePageAnimation();
   const { data: featuredSkills } = useSkills({ featured: true });
   const { data: categories } = useCategories();
@@ -26,7 +27,7 @@ export default function HomePage() {
       <SponsorBanner />
       <OfficialAuthors authors={authors} />
       <SkillSection
-        title="精选技能"
+        title={t("featured.title")}
         count={featuredSkills.length}
         slug="featured"
         link="/featured"

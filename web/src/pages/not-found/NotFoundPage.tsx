@@ -2,9 +2,11 @@ import { Link } from "react-router-dom";
 import { usePageAnimation } from "../../hooks/usePageAnimation";
 import { usePageMeta } from "../../hooks/usePageMeta";
 import PageContainer from "../../components/shared/PageContainer";
+import { useI18n } from "../../i18n";
 
 export default function NotFoundPage() {
-  usePageMeta({ title: "404 — 页面未找到" });
+  const { t } = useI18n();
+  usePageMeta({ title: `404 — ${t("notFound.title")}` });
   const pageRef = usePageAnimation();
 
   return (
@@ -18,10 +20,10 @@ export default function NotFoundPage() {
         404
       </div>
       <h1 style={{ fontSize: 24, fontWeight: 700, color: "var(--color-text)", margin: "0 0 8px" }}>
-        页面未找到
+        {t("notFound.title")}
       </h1>
       <p style={{ fontSize: 15, color: "var(--color-text-secondary)", margin: "0 0 28px" }}>
-        你访问的页面不存在或已被移除。
+        {t("notFound.desc")}
       </p>
       <Link
         to="/"
@@ -36,7 +38,7 @@ export default function NotFoundPage() {
           fontSize: 14,
         }}
       >
-        返回首页
+        {t("notFound.backHome")}
       </Link>
     </PageContainer>
   );

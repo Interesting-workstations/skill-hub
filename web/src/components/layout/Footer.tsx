@@ -1,9 +1,11 @@
 import { Link } from "react-router-dom";
 import { useSiteConfig } from "../../hooks/useSiteConfig";
+import { useI18n } from "../../i18n";
 import "./Footer.css";
 
 export default function Footer() {
   const { siteName, slogan, icp } = useSiteConfig();
+  const { t } = useI18n();
   return (
     <footer className="footer">
       <div className="footer-inner">
@@ -13,15 +15,15 @@ export default function Footer() {
         </div>
         <div className="footer-links">
           <div className="footer-col">
-            <h4>浏览</h4>
-            <Link to="/official">官方技能</Link>
-            <Link to="/featured">精选技能</Link>
-            <Link to="/categories">全部分类</Link>
-            <Link to="/articles">文章与教程</Link>
+            <h4>{t("footer.browse")}</h4>
+            <Link to="/official">{t("footer.official")}</Link>
+            <Link to="/featured">{t("footer.featured")}</Link>
+            <Link to="/categories">{t("footer.categories")}</Link>
+            <Link to="/articles">{t("footer.articles")}</Link>
           </div>
           <div className="footer-col">
-            <h4>贡献</h4>
-            <Link to="/submit">提交技能</Link>
+            <h4>{t("footer.contribute")}</h4>
+            <Link to="/submit">{t("footer.submitSkill")}</Link>
             <a href="https://github.com" target="_blank" rel="noopener noreferrer">
               GitHub
             </a>

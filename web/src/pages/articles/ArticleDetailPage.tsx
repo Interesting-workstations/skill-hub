@@ -7,7 +7,7 @@ import PageContainer from "../../components/shared/PageContainer";
 import Breadcrumb from "../../components/shared/Breadcrumb";
 import PageLoading from "../../components/shared/PageLoading";
 import MarkdownContent from "../../components/shared/MarkdownContent";
-import { site } from "../../config/site";
+import { useI18n } from "../../i18n";
 
 export default function ArticleDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -16,9 +16,10 @@ export default function ArticleDetailPage() {
     [id]
   );
   const pageRef = usePageAnimation();
+  const { t } = useI18n();
 
   usePageMeta({
-    title: article ? `${article.title} — ${site.name}` : `文章 — ${site.name}`,
+    title: article ? `${article.title} — ${t("brand.name")}` : `${t("articles.title")} — ${t("brand.name")}`,
     description: article ? article.content?.slice(0, 160).replace(/[#*`>\n]/g, " ") : undefined,
   });
 
@@ -29,13 +30,13 @@ export default function ArticleDetailPage() {
   if (!article) {
     return (
       <PageContainer ref={pageRef} maxWidth={720}>
-        <Breadcrumb items={[{ label: "Agent Skills 资源库", to: "/" }, { label: "文章与教程", to: "/articles" }]} />
+        <Breadcrumb items={[{ label: t("breadcrumb.home"), to: "/" }, { label: t("articles.title"), to: "/articles" }]} />
         <div style={{ textAlign: "center", padding: "60px 0", color: "var(--color-text-muted)" }}>
           <p style={{ fontSize: 40, marginBottom: 12 }}>📄</p>
-          <p>文章不存在或已下线</p>
+          <p>{t("article.notFound")}</p>
           <p style={{ marginTop: 16 }}>
             <Link to="/articles" style={{ color: "var(--color-primary)", textDecoration: "none" }}>
-              ← 返回文章列表
+              {t("articles.back")}
             </Link>
           </p>
         </div>
@@ -45,7 +46,7 @@ export default function ArticleDetailPage() {
 
   return (
     <PageContainer ref={pageRef} maxWidth={760}>
-      <Breadcrumb items={[{ label: "Agent Skills 资源库", to: "/" }, { label: "文章与教程", to: "/articles" }, { label: article.title }]} />
+      <Breadcrumb items={[{ label: t("breadcrumb.home"), to: "/" }, { label: t("articles.title"), to: "/articles" }, { label: article.title }]} />
 
       <h1 style={{ fontSize: 30, fontWeight: 800, color: "var(--color-text)", margin: "0 0 10px", lineHeight: 1.3 }}>
         {article.title}
@@ -71,7 +72,7 @@ export default function ArticleDetailPage() {
         {article.content ? (
           <MarkdownContent content={article.content} />
         ) : (
-          <p style={{ color: "var(--color-text-secondary)" }}>暂无正文</p>
+          <p style={{ color: "var(--color-text-secondary)" }}>{t("article.noContent")}</p>
         )}
       </div>
 
@@ -80,7 +81,7 @@ export default function ArticleDetailPage() {
           to="/articles"
           style={{ color: "var(--color-primary)", textDecoration: "none", fontSize: 14 }}
         >
-          ← 返回文章列表
+          {t("articles.back")}
         </Link>
       </div>
     </PageContainer>

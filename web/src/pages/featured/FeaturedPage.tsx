@@ -6,10 +6,11 @@ import { useSkills } from "../../hooks/useSkillData";
 import PageContainer from "../../components/shared/PageContainer";
 import Breadcrumb from "../../components/shared/Breadcrumb";
 import PageLoading from "../../components/shared/PageLoading";
-import { site } from "../../config/site";
+import { useI18n } from "../../i18n";
 
 export default function FeaturedPage() {
   const { data: skills, loading } = useSkills({ featured: true });
+  const { t } = useI18n();
   const pageRef = usePageAnimation((container, ctx) => {
     const cards = container.querySelectorAll(".skill-card");
     if (cards.length > 0) {
@@ -17,7 +18,7 @@ export default function FeaturedPage() {
     }
   }, [skills?.length]);
 
-  usePageMeta({ title: `精选技能 — ${site.name}` });
+  usePageMeta({ title: `${t("featured.title")} — ${t("brand.name")}` });
 
   if (loading) {
     return <PageLoading />;
@@ -25,11 +26,11 @@ export default function FeaturedPage() {
 
   return (
     <PageContainer ref={pageRef}>
-      <Breadcrumb items={[{ label: "Agent Skills 资源库", to: "/" }, { label: "精选技能" }]} />
+      <Breadcrumb items={[{ label: t("breadcrumb.home"), to: "/" }, { label: t("featured.title") }]} />
 
-      <h1 style={{ fontSize: 28, fontWeight: 800, color: "var(--color-text)", margin: "0 0 8px" }}>精选技能</h1>
+      <h1 style={{ fontSize: 28, fontWeight: 800, color: "var(--color-text)", margin: "0 0 8px" }}>{t("featured.title")}</h1>
       <p style={{ fontSize: 15, color: "var(--color-text-secondary)", margin: "0 0 28px" }}>
-        编辑精选的高质量技能，共 <strong style={{ color: "var(--color-text)" }}>{skills?.length ?? 0}</strong> 个
+        {t("featured.desc", { n: skills?.length ?? 0 })}
       </p>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 16 }}>

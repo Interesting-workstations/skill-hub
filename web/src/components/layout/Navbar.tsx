@@ -1,15 +1,35 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { buttonHoverEnter, buttonHoverLeave, buttonClick } from "../../animations";
+import { useI18n, type Lang } from "../../i18n";
 import "./Navbar.css";
 
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [langOpen, setLangOpen] = useState(false);
   const submitRef = useRef<HTMLAnchorElement>(null);
-  const langRef = useRef<HTMLButtonElement>(null);
+  const langBtnRef = useRef<HTMLDivElement>(null);
+  const { lang, setLang, t } = useI18n();
+
+  // 点击语言下拉外部时关闭
+  useEffect(() => {
+    if (!langOpen) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (langBtnRef.current && !langBtnRef.current.contains(e.target as Node)) {
+        setLangOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [langOpen]);
 
   const handleSubmitClick = () => {
     if (submitRef.current) buttonClick(submitRef.current);
+  };
+
+  const selectLang = (l: Lang) => {
+    setLang(l);
+    setLangOpen(false);
   };
 
   return (
@@ -35,17 +55,40 @@ export default function Navbar() {
         </Link>
 
         <div className="navbar-actions">
-          <button
-            className="btn-lang"
-            ref={langRef}
-            onMouseEnter={() => langRef.current && buttonHoverEnter(langRef.current)}
-            onMouseLeave={() => langRef.current && buttonHoverLeave(langRef.current)}
-          >
-            简体中文
-            <svg width="12" height="12" viewBox="0 0 12 12">
-              <path d="M3 5l3 3 3-3" stroke="currentColor" strokeWidth="1.5" fill="none" />
-            </svg>
-          </button>
+          <div className="lang-switch" ref={langBtnRef}>
+            <button
+              className="btn-lang"
+              onClick={() => setLangOpen((o) => !o)}
+              aria-haspopup="listbox"
+              aria-expanded={langOpen}
+              aria-label={t("nav.language")}
+            >
+              {lang === "zh" ? t("nav.zh") : t("nav.en")}
+              <svg width="12" height="12" viewBox="0 0 12 12">
+                <path d="M3 5l3 3 3-3" stroke="currentColor" strokeWidth="1.5" fill="none" />
+              </svg>
+            </button>
+            {langOpen && (
+              <div className="lang-menu" role="listbox">
+                <button
+                  className={`lang-option${lang === "zh" ? " active" : ""}`}
+                  onClick={() => selectLang("zh")}
+                  role="option"
+                  aria-selected={lang === "zh"}
+                >
+                  简体中文
+                </button>
+                <button
+                  className={`lang-option${lang === "en" ? " active" : ""}`}
+                  onClick={() => selectLang("en")}
+                  role="option"
+                  aria-selected={lang === "en"}
+                >
+                  English
+                </button>
+              </div>
+            )}
+          </div>
           <Link
             to="/submit"
             className="btn-submit"
@@ -54,12 +97,12 @@ export default function Navbar() {
             onMouseLeave={() => submitRef.current && buttonHoverLeave(submitRef.current)}
             onClick={handleSubmitClick}
           >
-            提交
+            {t("nav.submit")}
           </Link>
           <button
             className="btn-menu"
             onClick={() => setMenuOpen(!menuOpen)}
-            aria-label="打开菜单"
+            aria-label={t("nav.openMenu")}
             aria-expanded={menuOpen}
           >
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -77,16 +120,16 @@ export default function Navbar() {
       {menuOpen && (
         <div className="navbar-menu">
           <Link to="/official" className="navbar-menu-link" onClick={() => setMenuOpen(false)}>
-            官方技能
+            {t("nav.official")}
           </Link>
           <Link to="/featured" className="navbar-menu-link" onClick={() => setMenuOpen(false)}>
-            精选技能
+            {t("nav.featured")}
           </Link>
           <Link to="/categories" className="navbar-menu-link" onClick={() => setMenuOpen(false)}>
-            全部分类
+            {t("nav.categories")}
           </Link>
           <Link to="/submit" className="navbar-menu-link" onClick={() => setMenuOpen(false)}>
-            提交技能
+            {t("nav.submitSkill")}
           </Link>
         </div>
       )}

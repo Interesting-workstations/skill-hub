@@ -2,12 +2,14 @@ import { useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { sectionEnter, createAnimationContext } from "../../animations";
 import { useStats } from "../../hooks/useSkillData";
+import { useI18n } from "../../i18n";
 import "./Hero.css";
 
 export default function Hero() {
   const heroRef = useRef<HTMLElement>(null);
   const ctx = useRef(createAnimationContext());
   const { data: stats } = useStats();
+  const { t } = useI18n();
 
   const allSkillsCount = stats?.totalSkills ?? 0;
   const authorsCount = stats?.totalAuthors ?? 0;
@@ -34,13 +36,11 @@ export default function Hero() {
     <section className="hero" ref={heroRef}>
       <div className="hero-content">
         <h1 className="hero-title">
-          Agent Skills
-          <span className="hero-title-accent"> 资源库</span>
+          {t("hero.titleMain")}
+          {t("hero.titleAccent") && <span className="hero-title-accent">{t("hero.titleAccent")}</span>}
         </h1>
         <p className="hero-desc">
-          发现适用于 Claude Code、Codex 等 AI
-          编程助手的可复用技能。每个技能都是一组指令和代码包，教会你的 AI
-          助手执行专业任务并自动化复杂工作流。
+          {t("hero.description")}
         </p>
       </div>
 
@@ -48,32 +48,32 @@ export default function Hero() {
       <div className="hero-stats">
         <div className="hero-stat">
           <span className="hero-stat-num">{allSkillsCount}+</span>
-          <span className="hero-stat-label">收录技能</span>
+          <span className="hero-stat-label">{t("hero.stat.skills")}</span>
         </div>
         <div className="hero-stat-divider" />
         <div className="hero-stat">
           <span className="hero-stat-num">{authorsCount}+</span>
-          <span className="hero-stat-label">官方作者</span>
+          <span className="hero-stat-label">{t("hero.stat.authors")}</span>
         </div>
         <div className="hero-stat-divider" />
         <div className="hero-stat">
           <span className="hero-stat-num">{categoryCount}+</span>
-          <span className="hero-stat-label">技能分类</span>
+          <span className="hero-stat-label">{t("hero.stat.categories")}</span>
         </div>
         <div className="hero-stat-divider" />
         <div className="hero-stat">
           <span className="hero-stat-num">{officialCount}+</span>
-          <span className="hero-stat-label">官方技能</span>
+          <span className="hero-stat-label">{t("hero.stat.official")}</span>
         </div>
       </div>
 
       {/* CTA 按钮区 */}
       <div className="hero-cta">
         <Link to="/categories" className="hero-btn-primary">
-          浏览技能
+          {t("hero.cta.browse")}
         </Link>
         <Link to="/submit" className="hero-btn-secondary">
-          提交技能
+          {t("hero.cta.submit")}
         </Link>
         <a
           href="https://www.anthropic.com/news/skills"
@@ -81,7 +81,7 @@ export default function Hero() {
           target="_blank"
           rel="noopener noreferrer"
         >
-          了解更多关于 Skills →
+          {t("hero.cta.learnMore")}
         </a>
       </div>
     </section>

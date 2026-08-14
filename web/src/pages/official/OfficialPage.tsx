@@ -6,10 +6,11 @@ import { useSkills } from "../../hooks/useSkillData";
 import PageContainer from "../../components/shared/PageContainer";
 import Breadcrumb from "../../components/shared/Breadcrumb";
 import PageLoading from "../../components/shared/PageLoading";
-import { site } from "../../config/site";
+import { useI18n } from "../../i18n";
 
 export default function OfficialPage() {
   const { data: skills, loading } = useSkills({ official: true });
+  const { t } = useI18n();
   const pageRef = usePageAnimation((container, ctx) => {
     const cards = container.querySelectorAll(".skill-card");
     if (cards.length > 0) {
@@ -17,7 +18,7 @@ export default function OfficialPage() {
     }
   }, [skills?.length]);
 
-  usePageMeta({ title: `官方技能 — ${site.name}` });
+  usePageMeta({ title: `${t("officialPage.title")} — ${t("brand.name")}` });
 
   if (loading) {
     return <PageLoading />;
@@ -25,11 +26,11 @@ export default function OfficialPage() {
 
   return (
     <PageContainer ref={pageRef}>
-      <Breadcrumb items={[{ label: "Agent Skills 资源库", to: "/" }, { label: "官方技能" }]} />
+      <Breadcrumb items={[{ label: t("breadcrumb.home"), to: "/" }, { label: t("officialPage.title") }]} />
 
-      <h1 style={{ fontSize: 28, fontWeight: 800, color: "var(--color-text)", margin: "0 0 8px" }}>官方技能</h1>
+      <h1 style={{ fontSize: 28, fontWeight: 800, color: "var(--color-text)", margin: "0 0 8px" }}>{t("officialPage.title")}</h1>
       <p style={{ fontSize: 15, color: "var(--color-text-secondary)", margin: "0 0 28px" }}>
-        由官方维护和认证的高质量技能，共 <strong style={{ color: "var(--color-text)" }}>{skills?.length ?? 0}</strong> 个
+        {t("officialPage.desc", { n: skills?.length ?? 0 })}
       </p>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 16 }}>

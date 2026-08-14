@@ -1,6 +1,6 @@
 import { useEffect } from "react";
-import { site } from "../config/site";
 import { fetchSeo } from "../services/api/skills";
+import { useI18n } from "../i18n";
 import type { SeoConfig } from "../data/types";
 
 interface PageMeta {
@@ -33,9 +33,10 @@ function setMeta(name: string, content: string) {
 
 /**
  * 轻量 SEO：设置页面 title / description（无需第三方库）。
- * 路由切换时由下一页覆盖；卸载时恢复站点默认标题（后台 SEO 配置优先）。
+ * 路由切换时由下一页覆盖；卸载时恢复站点默认标题（后台 SEO 配置优先，随语言切换）。
  */
 export function usePageMeta({ title, description }: PageMeta) {
+  const { t } = useI18n();
   useEffect(() => {
     document.title = title;
     if (description) {
@@ -44,10 +45,10 @@ export function usePageMeta({ title, description }: PageMeta) {
       const seo = loadSeo();
       if (seo?.description) setMeta("description", seo.description);
     }
-    const fallbackTitle = loadSeo()?.title || site.title;
+    const fallbackTitle = loadSeo()?.title || t("brand.title");
     return () => {
       document.title = fallbackTitle;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, description]);
+  }, [title, description, t]);
 }

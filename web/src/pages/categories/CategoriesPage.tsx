@@ -6,11 +6,12 @@ import { usePageMeta } from "../../hooks/usePageMeta";
 import PageContainer from "../../components/shared/PageContainer";
 import Breadcrumb from "../../components/shared/Breadcrumb";
 import PageLoading from "../../components/shared/PageLoading";
-import { site } from "../../config/site";
+import { useI18n } from "../../i18n";
 
 export default function CategoriesPage() {
   const { data: categories, loading } = useCategories();
   const { data: stats } = useStats();
+  const { t } = useI18n();
   const pageRef = usePageAnimation((container, ctx) => {
     const cards = container.querySelectorAll(".category-card");
     if (cards.length > 0) {
@@ -18,7 +19,7 @@ export default function CategoriesPage() {
     }
   }, [categories?.length]);
 
-  usePageMeta({ title: `全部分类 — ${site.name}` });
+  usePageMeta({ title: `${t("categories.title")} — ${t("brand.name")}` });
 
   if (loading) {
     return <PageLoading />;
@@ -26,9 +27,9 @@ export default function CategoriesPage() {
 
   return (
     <PageContainer ref={pageRef}>
-      <Breadcrumb items={[{ label: "Agent Skills 资源库", to: "/" }, { label: "全部分类" }]} />
+      <Breadcrumb items={[{ label: t("breadcrumb.home"), to: "/" }, { label: t("categories.title") }]} />
 
-      <h1 style={{ fontSize: 28, fontWeight: 800, color: "var(--color-text)", margin: "0 0 28px" }}>全部分类</h1>
+      <h1 style={{ fontSize: 28, fontWeight: 800, color: "var(--color-text)", margin: "0 0 28px" }}>{t("categories.title")}</h1>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
         {/* Featured category */}
@@ -46,8 +47,8 @@ export default function CategoriesPage() {
           }}
         >
           <span style={{ fontSize: 28, display: "block", marginBottom: 8 }}>⭐</span>
-          <h3 style={{ fontSize: 17, fontWeight: 600, color: "var(--color-text)", margin: "0 0 4px" }}>精选技能</h3>
-          <p style={{ fontSize: 13, color: "var(--color-text-secondary)", margin: 0 }}>{stats?.featuredSkills ?? 0} 个技能</p>
+          <h3 style={{ fontSize: 17, fontWeight: 600, color: "var(--color-text)", margin: "0 0 4px" }}>{t("categories.featured")}</h3>
+          <p style={{ fontSize: 13, color: "var(--color-text-secondary)", margin: 0 }}>{t("categories.skillCount", { n: stats?.featuredSkills ?? 0 })}</p>
         </Link>
 
         {(categories ?? []).map((cat) => (
@@ -72,7 +73,7 @@ export default function CategoriesPage() {
                cat.slug === "productivity" ? "⚡" : "📦"}
             </span>
             <h3 style={{ fontSize: 17, fontWeight: 600, color: "var(--color-text)", margin: "0 0 4px" }}>{cat.name}</h3>
-            <p style={{ fontSize: 13, color: "var(--color-text-secondary)", margin: 0 }}>{cat.count} 个技能</p>
+            <p style={{ fontSize: 13, color: "var(--color-text-secondary)", margin: 0 }}>{t("categories.skillCount", { n: cat.count })}</p>
           </Link>
         ))}
       </div>

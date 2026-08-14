@@ -1,3 +1,4 @@
+import { useI18n } from "../../i18n";
 import "./SponsorBanner.css";
 
 interface Sponsor {
@@ -25,6 +26,7 @@ const sponsors: Sponsor[] = [
 ];
 
 export default function SponsorBanner() {
+  const { t } = useI18n();
   return (
     <div className="sponsor-banner">
       {sponsors.map((s) => (
@@ -39,7 +41,7 @@ export default function SponsorBanner() {
           <div className="sponsor-info">
             <div className="sponsor-header">
               <h3 className="sponsor-name">{s.name}</h3>
-              <span className="sponsor-badge">赞助</span>
+              <span className="sponsor-badge">{t("sponsor.badge")}</span>
             </div>
             <p className="sponsor-desc">{s.description}</p>
           </div>

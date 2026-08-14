@@ -8,12 +8,13 @@ import { usePageMeta } from "../../hooks/usePageMeta";
 import { useSkill, useSkills, useCategories } from "../../hooks/useSkillData";
 import { skillDownloadUrl } from "../../services/api/skills";
 import PageLoading from "../../components/shared/PageLoading";
-import { site } from "../../config/site";
+import { useI18n } from "../../i18n";
 import "./SkillDetailPage.css";
 
 export default function SkillDetailPage() {
   const { skillId } = useParams<{ skillId: string }>();
   const { data: skill, loading } = useSkill(skillId);
+  const { t } = useI18n();
   // 同作者的其他技能（skill 未就绪时不请求）
   const { data: authorSkillsData } = useSkills(skill ? { author: skill.author } : null);
   const authorSkills = (authorSkillsData ?? []).filter((s) => s.id !== skill?.id);
@@ -45,7 +46,7 @@ export default function SkillDetailPage() {
   }, [skillId, skill]);
 
   usePageMeta({
-    title: skill ? `${skill.name} — ${site.name}` : site.title,
+    title: skill ? `${skill.name} — ${t("brand.name")}` : t("brand.title"),
     description: skill?.description,
   });
 
@@ -56,8 +57,8 @@ export default function SkillDetailPage() {
   if (!skill) {
     return (
       <div className="detail-not-found">
-        <h2>技能未找到</h2>
-        <Link to="/">返回首页</Link>
+        <h2>{t("detail.notFound")}</h2>
+        <Link to="/">{t("detail.backHome")}</Link>
       </div>
     );
   }
@@ -66,7 +67,7 @@ export default function SkillDetailPage() {
     <div className="detail-page" ref={pageRef}>
       {/* Breadcrumb */}
       <nav className="detail-breadcrumb" aria-label="breadcrumb">
-        <Link to="/">Agent Skills 资源库</Link>
+        <Link to="/">{t("breadcrumb.home")}</Link>
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
           <path d="M5 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
         </svg>
@@ -83,7 +84,8 @@ export default function SkillDetailPage() {
               <div className="detail-meta">
                 <h1>{skill.name}</h1>
                 <span className="detail-author">
-                  作者：<Link to={`/author/${skill.author.toLowerCase()}`}>{skill.author}</Link>
+                  {t("detail.authorLabel")}
+                  <Link to={`/author/${skill.author.toLowerCase()}`}>{skill.author}</Link>
                 </span>
               </div>
             </div>
@@ -97,7 +99,7 @@ export default function SkillDetailPage() {
                   ref={copyBtnRef}
                   className="btn-copy"
                   onClick={handleCopy}
-                  title="复制安装命令"
+                  title={t("detail.copyInstall")}
                 >
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                     <rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
@@ -113,7 +115,7 @@ export default function SkillDetailPage() {
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                   <path d="M8 2v8M5 8l3 3 3-3M3 12h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
-                下载 ZIP
+                {t("detail.downloadZip")}
               </a>
               {skill.githubUrl && (
                 <a href={skill.githubUrl} className="btn-github" target="_blank" rel="noopener noreferrer">
@@ -130,7 +132,7 @@ export default function SkillDetailPage() {
               保留列表 / 代码块 / 表格等跨行结构 */}
           {skill.content?.map((section, i) => (
             <div key={i} className="detail-section">
-              <h2>{section.heading}</h2>
+              <h2>{section.heading === "概述" ? t("detail.overview") : section.heading}</h2>
               {section.body.length > 0 && (
                 <MarkdownContent content={section.body.join("\n")} />
               )}
@@ -153,7 +155,7 @@ export default function SkillDetailPage() {
           </div>
 
           {/* License */}
-          {skill.license && <p className="detail-license">许可：{skill.license}</p>}
+          {skill.license && <p className="detail-license">{t("detail.license", { license: skill.license })}</p>}
         </article>
 
         {/* Sidebar */}
@@ -161,14 +163,14 @@ export default function SkillDetailPage() {
           {/* Ad placeholder */}
           <div className="sidebar-ad">
             <p className="sidebar-ad-text">
-              投放广告？<a href="#">联系我们 →</a>
+              {t("detail.advertise")}<a href="#">{t("detail.contactUs")}</a>
             </p>
           </div>
 
           {/* More from author */}
           {authorSkills.length > 0 && (
             <div className="sidebar-more">
-              <h3>来自 {skill.author} 的更多技能</h3>
+              <h3>{t("detail.moreFrom", { author: skill.author })}</h3>
               <div className="sidebar-skills">
                 {authorSkills.slice(0, 4).map((s) => (
                   <SkillCard key={s.id} skill={s} />

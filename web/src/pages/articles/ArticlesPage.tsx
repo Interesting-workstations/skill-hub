@@ -6,21 +6,22 @@ import { fetchArticles } from "../../services/api/skills";
 import PageContainer from "../../components/shared/PageContainer";
 import Breadcrumb from "../../components/shared/Breadcrumb";
 import PageLoading from "../../components/shared/PageLoading";
-import { site } from "../../config/site";
+import { useI18n } from "../../i18n";
 
 export default function ArticlesPage() {
   const { data: articles, loading } = useAsyncData(fetchArticles, []);
   const pageRef = usePageAnimation();
+  const { t } = useI18n();
 
-  usePageMeta({ title: `文章与教程 — ${site.name}` });
+  usePageMeta({ title: `${t("articles.title")} — ${t("brand.name")}` });
 
   return (
     <PageContainer ref={pageRef} maxWidth={720}>
-      <Breadcrumb items={[{ label: "Agent Skills 资源库", to: "/" }, { label: "文章与教程" }]} />
+      <Breadcrumb items={[{ label: t("breadcrumb.home"), to: "/" }, { label: t("articles.title") }]} />
 
-      <h1 style={{ fontSize: 28, fontWeight: 800, color: "var(--color-text)", margin: "0 0 8px" }}>文章与教程</h1>
+      <h1 style={{ fontSize: 28, fontWeight: 800, color: "var(--color-text)", margin: "0 0 8px" }}>{t("articles.title")}</h1>
       <p style={{ fontSize: 15, color: "var(--color-text-secondary)", margin: "0 0 28px", lineHeight: 1.6 }}>
-        官方发布的技能使用教程与公告
+        {t("articles.desc")}
       </p>
 
       {loading ? (
@@ -36,7 +37,7 @@ export default function ArticlesPage() {
             fontSize: 14,
           }}
         >
-          暂无文章，敬请期待
+          {t("articles.empty")}
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
