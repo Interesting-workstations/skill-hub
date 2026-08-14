@@ -41,7 +41,10 @@ export default function OfficialPage() {
       <Breadcrumb
         items={[
           { label: t("breadcrumb.home"), to: "/" },
-          { label: t("officialPage.title"), to: "/official" },
+          // 组织筛选时父级为「官方组织」页，保证导航链路一致：官方组织 → 该组织官方技能
+          currentOrg
+            ? { label: t("orgs.title"), to: "/orgs" }
+            : { label: t("officialPage.title"), to: "/official" },
           ...(currentOrg ? [{ label: currentOrg.displayName }] : []),
         ]}
       />
@@ -65,8 +68,8 @@ export default function OfficialPage() {
       </p>
       {currentOrg && (
         <p style={{ margin: "0 0 20px" }}>
-          <Link to="/official" style={{ color: "var(--color-primary)", textDecoration: "none", fontSize: 14 }}>
-            ← {t("officialPage.back")}
+          <Link to="/orgs" style={{ color: "var(--color-primary)", textDecoration: "none", fontSize: 14 }}>
+            ← {t("officialPage.backOrgs")}
           </Link>
         </p>
       )}
