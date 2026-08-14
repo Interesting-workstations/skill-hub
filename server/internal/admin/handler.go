@@ -73,6 +73,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	h.protected(mux, "GET /api/v1/admin/data", h.listData)
 	h.protected(mux, "PUT /api/v1/admin/data/{id}/status", h.updateDataStatus)
 	h.protected(mux, "POST /api/v1/admin/data/batch-status", h.batchUpdateDataStatus)
+	h.protected(mux, "POST /api/v1/admin/data/auto-audit", h.autoAuditData)
 	h.protected(mux, "DELETE /api/v1/admin/data/{id}", h.deleteData)
 
 	// 文章
@@ -593,6 +594,16 @@ func (h *Handler) batchUpdateDataStatus(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	response.OK(w, map[string]int{"updated": len(body.IDs)})
+}
+
+// POST /api/v1/admin/data/auto-audit —— 机器人自动审核（内容完整规范的直接通过）。
+func (h *Handler) autoAuditData(w http.ResponseWriter, _ *http.Request) {
+	res, err := h.svc.AutoAuditPending()
+	if err != nil {
+		response.Fail(w, http.StatusInternalServerError, 50001, "系统错误")
+		return
+	}
+	response.OK(w, res)
 }
 
 func (h *Handler) updateDataStatus(w http.ResponseWriter, r *http.Request) {

@@ -41,6 +41,13 @@ type DataFilter struct {
 	Sort     string
 }
 
+// AutoAuditResult 机器人自动审核结果。
+type AutoAuditResult struct {
+	Total    int `json:"total"`
+	Approved int `json:"approved"`
+	Manual   int `json:"manual"`
+}
+
 // Repository 定义后台管理数据访问接口。
 type Repository interface {
 	ListTasks() ([]domain.CrawlTask, error)
@@ -65,6 +72,7 @@ type Repository interface {
 	UpdateDataStatus(id, status string) error
 	UpdateDataStatusBatch(ids []string, status string) error
 	DeleteData(id string) error
+	AutoAuditPending() (AutoAuditResult, error)
 
 	ListArticles() ([]domain.Article, error)
 	GetArticle(id string) (domain.Article, error)
@@ -789,6 +797,73 @@ func (r *mysqlRepo) UpdateDataStatusBatch(ids []string, status string) error {
 func (r *mysqlRepo) DeleteData(id string) error {
 	_, err := r.db.Exec(`DELETE FROM skills WHERE id = ?`, id)
 	return err
+}
+
+// AutoAuditPending 机器人自动审核：对待审核技能按规则判定，
+// 内容完整规范且无重复的直接通过（approved），有问题的（内容不足/描述缺失/重复/名称异常）留给人工。
+func (r *mysqlRepo) AutoAuditPending() (AutoAuditResult, error) {
+	// 已通过/已发布集合（重复检测：同 author+name 已存在 → 转人工）
+	existing := map[string]bool{}
+	erows, err := r.db.Query(`SELECT author, name FROM skills WHERE data_status IN ('published','approved')`)
+	if err != nil {
+		return AutoAuditResult{}, err
+	}
+	for erows.Next() {
+		var a, n string
+		if erows.Scan(&a, &n) == nil {
+			existing[strings.ToLower(a+"\x00"+n)] = true
+		}
+	}
+	erows.Close()
+
+	rows, err := r.db.Query(`SELECT id, name, author, description, content FROM skills WHERE data_status = 'pending'`)
+	if err != nil {
+		return AutoAuditResult{}, err
+	}
+	defer rows.Close()
+
+	var res AutoAuditResult
+	var approvedIDs []string
+	for rows.Next() {
+		var id, name, author, desc, content string
+		if err := rows.Scan(&id, &name, &author, &desc, &content); err != nil {
+			continue
+		}
+		res.Total++
+		if skillAutoPass(name, desc, content) && !existing[strings.ToLower(author+"\x00"+name)] {
+			approvedIDs = append(approvedIDs, id)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return res, err
+	}
+	if len(approvedIDs) > 0 {
+		if err := r.UpdateDataStatusBatch(approvedIDs, "approved"); err != nil {
+			return res, err
+		}
+	}
+	res.Approved = len(approvedIDs)
+	res.Manual = res.Total - res.Approved
+	return res, nil
+}
+
+// skillAutoPass 机器人审核通过规则（全部满足才自动通过）：
+// ①名称长度 2-100 ②描述至少 20 字符 ③正文（content JSON 文本）至少 800 字符。
+// 内容不足/描述缺失/名称异常 → 返回 false，转人工。
+func skillAutoPass(name, desc, content string) bool {
+	name = strings.TrimSpace(name)
+	desc = strings.TrimSpace(desc)
+	content = strings.TrimSpace(content)
+	if len(name) < 2 || len(name) > 100 {
+		return false
+	}
+	if len(desc) < 20 {
+		return false
+	}
+	if len(content) < 800 {
+		return false
+	}
+	return true
 }
 
 // ---------- 文章 ----------

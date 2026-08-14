@@ -72,6 +72,10 @@ export const contentApi = {
   batchUpdateDataStatus(ids: string[], status: DataStatus): Promise<void> {
     return http.post<void>(`${base}/data/batch-status`, { ids, status });
   },
+  /** 机器人自动审核：内容完整规范且无重复的直接通过，有问题的留人工 */
+  autoAuditData(): Promise<{ total: number; approved: number; manual: number }> {
+    return http.post<{ total: number; approved: number; manual: number }>(`${base}/data/auto-audit`);
+  },
   deleteData(id: string): Promise<void> {
     return http.delete<void>(`${base}/data/${encodeURIComponent(id)}`);
   },

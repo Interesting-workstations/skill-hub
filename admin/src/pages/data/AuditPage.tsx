@@ -36,6 +36,7 @@ export default function AuditPage() {
   const [filter, setFilter] = useState<DataFilter>({ status: "pending", sort: "stars" });
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
+  const [autoAuditing, setAutoAuditing] = useState(false);
 
   // 从当前结果提取分类（用于下拉筛选）
   const categories = useMemo(
@@ -87,6 +88,24 @@ export default function AuditPage() {
       void load(filter);
     } catch {
       // 错误已由全局 Toast 提示
+    }
+  };
+
+  // 机器人自动审核：内容完整规范的直接通过，有问题的留给人工
+  const runAutoAudit = async () => {
+    setAutoAuditing(true);
+    try {
+      const res = await contentApi.autoAuditData();
+      if (res.manual > 0) {
+        toast.success(`🤖 机器人审核完成：${res.approved} 条直接通过，${res.manual} 条转人工`);
+      } else {
+        toast.success(`🤖 机器人审核完成：全部 ${res.approved} 条通过`);
+      }
+      void load(filter);
+    } catch {
+      // 错误已由全局 Toast 提示
+    } finally {
+      setAutoAuditing(false);
     }
   };
 
@@ -168,6 +187,14 @@ export default function AuditPage() {
             审核爬虫抓取的数据：官方来源自动发布，社区来源需人工审核。支持筛选、高星优先、全选批量操作。
           </div>
         </div>
+        <button
+          className="btn btn-primary"
+          onClick={runAutoAudit}
+          disabled={autoAuditing}
+          title="内容完整规范且无重复的直接通过，有问题的交给人工审核"
+        >
+          {autoAuditing ? "🤖 审核中…" : "🤖 机器人审核"}
+        </button>
       </div>
 
       <AppTable

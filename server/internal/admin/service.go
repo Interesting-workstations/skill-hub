@@ -928,6 +928,11 @@ func (s *Service) UpdateDataStatusBatch(ids []string, status string) error {
 	return s.repo.UpdateDataStatusBatch(ids, status)
 }
 
+// AutoAuditPending 机器人自动审核：内容完整规范且无重复的直接通过，有问题的留人工。
+func (s *Service) AutoAuditPending() (AutoAuditResult, error) {
+	return s.repo.AutoAuditPending()
+}
+
 func (s *Service) DeleteData(id string) error {
 	return s.repo.DeleteData(id)
 }

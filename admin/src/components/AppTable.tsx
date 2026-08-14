@@ -129,15 +129,32 @@ export default function AppTable<T>({
           <span>共 {totalCount} 条</span>
           <div className="pagination">
             <button disabled={page <= 1} onClick={() => onPageChange?.(page - 1)}>‹</button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-              <button key={p} className={p === page ? "active" : ""} onClick={() => onPageChange?.(p)}>
-                {p}
-              </button>
-            ))}
+            {pageList(page, totalPages).map((p, i) =>
+              p === "…" ? (
+                <span key={`e${i}`} className="page-ellipsis">…</span>
+              ) : (
+                <button key={p} className={p === page ? "active" : ""} onClick={() => onPageChange?.(p)}>
+                  {p}
+                </button>
+              )
+            )}
             <button disabled={page >= totalPages} onClick={() => onPageChange?.(page + 1)}>›</button>
           </div>
         </div>
       )}
     </div>
   );
+}
+
+/** 智能分页：页数多时用省略号折叠（1 … 当前附近 … 末页） */
+function pageList(current: number, total: number): (number | "…")[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages: (number | "…")[] = [1];
+  const start = Math.max(2, current - 1);
+  const end = Math.min(total - 1, current + 1);
+  if (start > 2) pages.push("…");
+  for (let i = start; i <= end; i++) pages.push(i);
+  if (end < total - 1) pages.push("…");
+  pages.push(total);
+  return pages;
 }
