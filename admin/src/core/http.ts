@@ -6,6 +6,7 @@
  *  - 登录 / 刷新接口自身的 401 不触发续期，避免循环 */
 
 import { auth } from "./auth";
+import { reportGlobalError } from "./toast";
 
 export interface ApiResponse<T> {
   code: number;
@@ -91,7 +92,15 @@ async function request<T>(
     }
 
     if (!res.ok) {
-      throw new ApiError(res.status, `请求失败 (${res.status})`);
+      // 尝试解析后端返回的业务错误信息（如「名称必填」），解析失败时回退为通用信息
+      let message = `请求失败 (${res.status})`;
+      try {
+        const errBody = (await res.json()) as ApiResponse<unknown>;
+        if (errBody.message) message = errBody.message;
+      } catch {
+        // 非 JSON 响应，保留默认信息
+      }
+      throw new ApiError(res.status, message);
     }
     const body = (await res.json()) as ApiResponse<T>;
     if (body.code !== 0) {
@@ -112,6 +121,15 @@ async function request<T>(
     if (isGet && retries > 0) {
       await new Promise((r) => setTimeout(r, 400));
       return request<T>(path, options, retries - 1, allowAuthRetry);
+    }
+    // 全局错误提示（认证相关由登录页自行提示，不弹 Toast）
+    if (
+      err instanceof ApiError &&
+      !isAuthPath(path) &&
+      err.code !== 401 &&
+      err.code !== 40101
+    ) {
+      reportGlobalError(err.message);
     }
     throw err;
   }

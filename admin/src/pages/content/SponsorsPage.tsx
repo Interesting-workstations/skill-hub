@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import AppTable, { type Column } from "../../components/AppTable";
 import AppDialog from "../../components/AppDialog";
+import { useToast } from "../../components/Toast";
 import { contentApi } from "../../api/content";
 import type { Sponsor } from "../../types";
 
@@ -11,6 +12,7 @@ const POSITION_OPTIONS = [
 ];
 
 export default function SponsorsPage() {
+  const toast = useToast();
   const [sponsors, setSponsors] = useState<Sponsor[]>([]);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
@@ -65,16 +67,22 @@ export default function SponsorsPage() {
   };
 
   const doSave = async () => {
-    const input = { name, logo, descriptionZh, descriptionEn, url, position, enabled, sortOrder };
-    if (editing) {
-      await contentApi.updateSponsor(editing.id, input);
-      setEditing(null);
-    } else {
-      await contentApi.createSponsor(input);
-      setCreateOpen(false);
+    const wasEditing = Boolean(editing);
+    try {
+      const input = { name, logo, descriptionZh, descriptionEn, url, position, enabled, sortOrder };
+      if (editing) {
+        await contentApi.updateSponsor(editing.id, input);
+        setEditing(null);
+      } else {
+        await contentApi.createSponsor(input);
+        setCreateOpen(false);
+      }
+      resetForm();
+      await load();
+      toast.success(wasEditing ? "赞助已更新" : "赞助已创建");
+    } catch {
+      // 错误已由全局 Toast 自动提示
     }
-    resetForm();
-    await load();
   };
 
   const handleSubmit = (e: FormEvent) => {
@@ -217,10 +225,14 @@ export default function SponsorsPage() {
         title="删除赞助"
         onClose={() => setConfirmDelete(null)}
         onConfirm={async () => {
-          if (confirmDelete) {
+          if (!confirmDelete) return;
+          try {
             await contentApi.deleteSponsor(confirmDelete.id);
             setConfirmDelete(null);
             await load();
+            toast.success("赞助已删除");
+          } catch {
+            // 错误已由全局 Toast 自动提示
           }
         }}
         confirmText="确认删除"

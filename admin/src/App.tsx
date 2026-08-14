@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AppProvider } from "./store/AppContext";
+import { ToastProvider } from "./components/Toast";
 import { auth } from "./core/auth";
 import AdminLayout from "./layouts/AdminLayout/AdminLayout";
 import LoginPage from "./pages/login/LoginPage";
@@ -30,38 +31,40 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   return (
-    <AppProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route
-            path="/"
-            element={
-              <RequireAuth>
-                <AdminLayout />
-              </RequireAuth>
-            }
-          >
-            <Route index element={<DashboardPage />} />
-            <Route path="crawler/tasks" element={<TaskListPage />} />
-            <Route path="crawler/executions" element={<ExecutionListPage />} />
-            <Route path="crawler/executions/:id" element={<ExecutionDetailPage />} />
-            <Route path="crawler/failures" element={<FailurePage />} />
-            <Route path="crawler/config" element={<ConfigPage />} />
-            <Route path="data/items" element={<CrawlerDataPage />} />
-            <Route path="data/audit" element={<AuditPage />} />
-            <Route path="data/export" element={<ExportPage />} />
-            <Route path="content/categories" element={<CategoryPage />} />
-            <Route path="content/homepage" element={<HomepagePage />} />
-            <Route path="content/articles" element={<ArticlePage />} />
-            <Route path="content/sponsors" element={<SponsorsPage />} />
-            <Route path="content/seo" element={<SeoPage />} />
-            <Route path="system/admin" element={<AdminSettingsPage />} />
-            <Route path="system/settings" element={<SiteSettingsPage />} />
-          </Route>
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </BrowserRouter>
-    </AppProvider>
+    <ToastProvider>
+      <AppProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route
+              path="/"
+              element={
+                <RequireAuth>
+                  <AdminLayout />
+                </RequireAuth>
+              }
+            >
+              <Route index element={<DashboardPage />} />
+              <Route path="crawler/tasks" element={<TaskListPage />} />
+              <Route path="crawler/executions" element={<ExecutionListPage />} />
+              <Route path="crawler/executions/:id" element={<ExecutionDetailPage />} />
+              <Route path="crawler/failures" element={<FailurePage />} />
+              <Route path="crawler/config" element={<ConfigPage />} />
+              <Route path="data/items" element={<CrawlerDataPage />} />
+              <Route path="data/audit" element={<AuditPage />} />
+              <Route path="data/export" element={<ExportPage />} />
+              <Route path="content/categories" element={<CategoryPage />} />
+              <Route path="content/homepage" element={<HomepagePage />} />
+              <Route path="content/articles" element={<ArticlePage />} />
+              <Route path="content/sponsors" element={<SponsorsPage />} />
+              <Route path="content/seo" element={<SeoPage />} />
+              <Route path="system/admin" element={<AdminSettingsPage />} />
+              <Route path="system/settings" element={<SiteSettingsPage />} />
+            </Route>
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </AppProvider>
+    </ToastProvider>
   );
 }

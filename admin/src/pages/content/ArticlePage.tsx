@@ -1,10 +1,12 @@
 import { useEffect, useState, type FormEvent } from "react";
 import AppTable, { type Column } from "../../components/AppTable";
 import AppDialog from "../../components/AppDialog";
+import { useToast } from "../../components/Toast";
 import { contentApi } from "../../api/content";
 import type { Article } from "../../types";
 
 export default function ArticlePage() {
+  const toast = useToast();
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
@@ -47,15 +49,21 @@ export default function ArticlePage() {
   };
 
   const doSave = async () => {
-    if (editing) {
-      await contentApi.updateArticle(editing.id, { title, category, status, content });
-      setEditing(null);
-    } else {
-      await contentApi.createArticle({ title, category, content });
-      setCreateOpen(false);
+    const wasEditing = Boolean(editing);
+    try {
+      if (editing) {
+        await contentApi.updateArticle(editing.id, { title, category, status, content });
+        setEditing(null);
+      } else {
+        await contentApi.createArticle({ title, category, content });
+        setCreateOpen(false);
+      }
+      resetForm();
+      await load();
+      toast.success(wasEditing ? "文章已更新" : "文章已创建");
+    } catch {
+      // 错误已由全局 Toast 自动提示
     }
-    resetForm();
-    await load();
   };
 
   const handleSubmit = (e: FormEvent) => {
@@ -173,10 +181,14 @@ export default function ArticlePage() {
         title="删除文章"
         onClose={() => setConfirmDelete(null)}
         onConfirm={async () => {
-          if (confirmDelete) {
+          if (!confirmDelete) return;
+          try {
             await contentApi.deleteArticle(confirmDelete.id);
             setConfirmDelete(null);
             await load();
+            toast.success("文章已删除");
+          } catch {
+            // 错误已由全局 Toast 自动提示
           }
         }}
         confirmText="确认删除"
