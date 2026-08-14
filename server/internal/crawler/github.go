@@ -2,6 +2,7 @@ package crawler
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -37,6 +39,9 @@ type Client struct {
 	http  *http.Client
 	// officialOrgs 官方组织表（owner → 展示信息）；默认内置，可用 SetOfficialOrgs 动态覆盖。
 	officialOrgs map[string]OrgInfo
+	// stopCh 停止信号：调用 Cancel() 关闭后，进行中的请求与循环尽快退出（后台手动停止任务用）。
+	stopCh     chan struct{}
+	cancelOnce sync.Once
 }
 
 // NewClient 创建客户端；token 为空时以匿名方式请求（速率受限）。
@@ -45,7 +50,55 @@ func NewClient(token string) *Client {
 		token:        token,
 		http:         &http.Client{Timeout: 20 * time.Second},
 		officialOrgs: defaultOfficialOrgs,
+		stopCh:       make(chan struct{}),
 	}
+}
+
+// Cancel 请求停止客户端：关闭停止信号，进行中的 HTTP 请求立即取消。
+// 停止后再次调用无副作用（幂等）。
+func (c *Client) Cancel() {
+	c.cancelOnce.Do(func() { close(c.stopCh) })
+}
+
+// IsCancelled 客户端是否已被停止。
+func (c *Client) IsCancelled() bool {
+	select {
+	case <-c.stopCh:
+		return true
+	default:
+		return false
+	}
+}
+
+func (c *Client) get(path string, out any) error {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	// 停止信号触发时取消请求上下文（手动停止任务时立即中断正在进行的请求）
+	go func() {
+		select {
+		case <-c.stopCh:
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiBase+path, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+	if c.token != "" {
+		req.Header.Set("Authorization", "Bearer "+c.token)
+	}
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("GitHub API %s: %s", path, resp.Status)
+	}
+	return json.NewDecoder(resp.Body).Decode(out)
 }
 
 // SetOfficialOrgs 注入动态官方组织列表（来自数据库，替换内置默认）。
@@ -93,27 +146,6 @@ func (c *Client) OfficialAvatar(owner string) string {
 		}
 	}
 	return ""
-}
-
-func (c *Client) get(path string, out any) error {
-	req, err := http.NewRequest(http.MethodGet, apiBase+path, nil)
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
-	if c.token != "" {
-		req.Header.Set("Authorization", "Bearer "+c.token)
-	}
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("GitHub API %s: %s", path, resp.Status)
-	}
-	return json.NewDecoder(resp.Body).Decode(out)
 }
 
 // GetUserType 查询 GitHub 用户/组织类型（Organization / User / NotFound）。

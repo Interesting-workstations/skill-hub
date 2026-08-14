@@ -18,8 +18,7 @@ import (
 )
 
 // DataItem 抓取数据（含审核状态）。
-type DataItem struct {
-	ID          string `json:"id"`
+type DataItem struct {	ID          string `json:"id"`
 	Name        string `json:"name"`
 	Author      string `json:"author"`
 	Category    string `json:"category"`
@@ -60,6 +59,8 @@ type Repository interface {
 	GetExecution(id string) (domain.ExecutionRecord, error)
 	CreateExecution(e *domain.ExecutionRecord) error
 	UpdateExecution(id string, fields map[string]any) error
+	DeleteExecution(id string) error
+	RecoverStale() error
 
 	ListFailures() ([]domain.FailureRecord, error)
 	CreateFailure(f *domain.FailureRecord) error
@@ -651,7 +652,22 @@ func (r *mysqlRepo) UpdateExecution(id string, fields map[string]any) error {
 	return r.update("crawl_executions", id, fields)
 }
 
-// ---------- 失败任务 ----------
+func (r *mysqlRepo) DeleteExecution(id string) error {
+	_, err := r.db.Exec(`DELETE FROM crawl_executions WHERE id = ?`, id)
+	return err
+}
+
+// RecoverStale 服务启动时清理残留状态：
+// 上次进程退出/崩溃留下的 running 执行记录标记为“中断”，对应 running 任务恢复为待运行。
+func (r *mysqlRepo) RecoverStale() error {
+	_, err := r.db.Exec(`UPDATE crawl_executions SET status='failed', progress=100,
+		end_time=?, duration='服务重启中断' WHERE status='running'`, time.Now().Format("2006-01-02 15:04:05"))
+	if err != nil {
+		return err
+	}
+	_, err = r.db.Exec(`UPDATE crawl_tasks SET status='waiting' WHERE status='running'`)
+	return err
+}
 
 func (r *mysqlRepo) ListFailures() ([]domain.FailureRecord, error) {
 	rows, err := r.db.Query(`SELECT id, task_id, task_name, url, reason, error, retry_count, failed_at

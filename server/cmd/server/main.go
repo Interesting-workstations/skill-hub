@@ -42,6 +42,13 @@ func main() {
 	}
 	adminSvc := admin.NewService(adminRepo)
 
+	// 清理上次进程退出/崩溃残留的 running 执行记录与任务，避免永久卡在“运行中”
+	if err := adminSvc.RecoverStaleExecutions(); err != nil {
+		log.Printf("⚠️ 清理残留执行记录失败: %v", err)
+	} else {
+		log.Println("✅ 已清理残留的 running 执行记录/任务")
+	}
+
 	srv := &http.Server{
 		Addr:         addr,
 		Handler:      router.New(svc, adminSvc),

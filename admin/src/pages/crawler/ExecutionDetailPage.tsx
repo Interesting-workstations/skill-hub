@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import TaskStatus from "../../components/TaskStatus";
 import TaskProgress from "../../components/TaskProgress";
 import ExecutionLog from "../../components/ExecutionLog";
@@ -26,11 +26,24 @@ function isTerminal(status?: ExecutionRecord["status"]): boolean {
 
 export default function ExecutionDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [record, setRecord] = useState<ExecutionRecord | null>(null);
   const [step, setStep] = useState("");
   const [wsState, setWsState] = useState<WsState>("connecting");
   const retryRef = useRef(0);
   const closedRef = useRef(false); // 任务终态后不再重连
+
+  // 停止本次执行（取消爬虫并标记 stopped，随后刷新详情）
+  const stopExecution = () => {
+    if (!id || !window.confirm("确定停止本次执行吗？")) return;
+    crawlerApi.stopExecution(id).then(() => crawlerApi.executionDetail(id).then(setRecord));
+  };
+
+  // 删除本次执行记录（删除后返回列表）
+  const deleteExecution = () => {
+    if (!id || !window.confirm("确定删除本次执行记录吗？删除后不可恢复。")) return;
+    crawlerApi.deleteExecution(id).then(() => navigate("/crawler/executions"));
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -171,13 +184,19 @@ export default function ExecutionDetailPage() {
             <Link to="/crawler/executions">← 返回执行记录</Link>
           </div>
         </div>
-        <span
-          className={`ws-badge ${wsState === "open" ? "on" : wsState === "connecting" ? "ing" : "off"}`}
-          title={wsState === "open" ? "实时推送已连接" : wsState === "connecting" ? "实时推送连接中…" : "连接已断开"}
-        >
-          <span className="ws-dot" />
-          {wsState === "open" ? "实时推送" : wsState === "connecting" ? "连接中" : "已断开"}
-        </span>
+        <div className="header-ops">
+          {record.status === "running" && (
+            <button className="btn-link danger" onClick={stopExecution}>停止执行</button>
+          )}
+          <button className="btn-link danger" onClick={deleteExecution}>删除记录</button>
+          <span
+            className={`ws-badge ${wsState === "open" ? "on" : wsState === "connecting" ? "ing" : "off"}`}
+            title={wsState === "open" ? "实时推送已连接" : wsState === "connecting" ? "实时推送连接中…" : "连接已断开"}
+          >
+            <span className="ws-dot" />
+            {wsState === "open" ? "实时推送" : wsState === "connecting" ? "连接中" : "已断开"}
+          </span>
+        </div>
       </div>
 
       {/* 基本信息 */}

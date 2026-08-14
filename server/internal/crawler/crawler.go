@@ -75,6 +75,10 @@ func (c *Client) CrawlDetailed(opts CrawlOptions) ([]Skill, []RepoFailure, error
 		go func(fullName string) {
 			defer wg.Done()
 			defer func() { <-sem }()
+			// 手动停止后剩余仓库直接放弃，快速退出
+			if c.IsCancelled() {
+				return
+			}
 			repo, err := c.GetRepo(fullName)
 			if err != nil {
 				mu.Lock()
@@ -172,6 +176,10 @@ func (c *Client) searchReposPaginated(query string, perPage, limit int) ([]Repo,
 	}
 	var all []Repo
 	for page := 1; page <= 10; page++ {
+		// 手动停止后不再继续翻页搜索
+		if c.IsCancelled() {
+			return all, nil
+		}
 		batch, err := c.SearchRepos(query, perPage, page)
 		if err != nil {
 			return all, err

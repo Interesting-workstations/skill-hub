@@ -2,12 +2,14 @@
 package admin
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -66,6 +68,7 @@ type Service struct {
 
 	execSubs  map[string]map[chan domain.ExecEvent]struct{} // execID → 订阅者（执行进度/日志推送）
 	wsTickets map[string]wsTicket                           // ticket → 一次性 WS 票据
+	execCancels map[string]context.CancelFunc                // execID → 取消函数（手动停止任务）
 }
 
 // NewService 创建后台管理服务。
@@ -82,6 +85,7 @@ func NewService(repo Repository) *Service {
 		loginAttempts: make(map[string][]int64),
 		execSubs:      make(map[string]map[chan domain.ExecEvent]struct{}),
 		wsTickets:     make(map[string]wsTicket),
+		execCancels:   make(map[string]context.CancelFunc),
 	}
 }
 
@@ -615,7 +619,19 @@ func (s *Service) RunTask(id string) (domain.ExecutionRecord, error) {
 		return domain.ExecutionRecord{}, err
 	}
 
-	go s.executeTask(task.ID, task.Name, task.Query, record.ID)
+	// 每次执行使用独立爬虫客户端与可取消上下文（互不影响，支持后台手动停止）
+	client := crawler.NewClient(os.Getenv("GITHUB_TOKEN"))
+	ctx, cancel := context.WithCancel(context.Background())
+	s.execCancels[record.ID] = cancel
+
+	go func() {
+		defer func() {
+			s.mu.Lock()
+			delete(s.execCancels, record.ID)
+			s.mu.Unlock()
+		}()
+		s.executeTask(ctx, client, task.ID, task.Name, task.Query, record.ID)
+	}()
 	return record, nil
 }
 
@@ -624,9 +640,52 @@ func (s *Service) StopTask(id string) error {
 	return s.repo.UpdateTask(id, map[string]any{"status": domain.TaskStopped})
 }
 
+// StopExecution 停止一次执行：取消运行中的爬虫 goroutine，并把执行记录标记为已停止。
+// 若该执行已无运行中的 goroutine（如服务重启后的残留 running），直接标记停止。
+func (s *Service) StopExecution(id string) error {
+	s.mu.Lock()
+	if cancel, ok := s.execCancels[id]; ok {
+		cancel()
+	}
+	s.mu.Unlock()
+	return s.repo.UpdateExecution(id, map[string]any{
+		"status": domain.TaskStopped, "progress": 100, "end_time": now(),
+		"duration": "已手动停止",
+	})
+}
+
+// DeleteExecution 删除执行记录；若仍在运行先取消其 goroutine。
+func (s *Service) DeleteExecution(id string) error {
+	s.mu.Lock()
+	if cancel, ok := s.execCancels[id]; ok {
+		cancel()
+		delete(s.execCancels, id)
+	}
+	s.mu.Unlock()
+	return s.repo.DeleteExecution(id)
+}
+
+// RecoverStaleExecutions 服务启动时清理残留状态：
+// 上次进程退出/崩溃留下的 running 执行记录与任务全部标记为中断，避免永久卡在“运行中”。
+func (s *Service) RecoverStaleExecutions() error {
+	return s.repo.RecoverStale()
+}
+
 // executeTask 后台执行爬虫并更新记录与统计，同时通过 WebSocket 实时推送进度与日志。
-func (s *Service) executeTask(taskID, taskName, query, execID string) {
+func (s *Service) executeTask(ctx context.Context, client *crawler.Client, taskID, taskName, query, execID string) {
 	start := time.Now()
+
+	// 兜底：任何 panic 都不得让执行记录永久卡在 running
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("[exec %s] panic: %v", execID, r)
+			_ = s.repo.UpdateExecution(execID, map[string]any{
+				"status": domain.TaskFailed, "progress": 100, "end_time": now(),
+				"duration": time.Since(start).Round(time.Second).String(),
+			})
+			_ = s.repo.UpdateTask(taskID, map[string]any{"status": domain.TaskFailed, "fail_count": increment(s, taskID, "fail_count")})
+		}
+	}()
 
 	// 进度：写库 + 广播
 	progress := func(p int, step string) {
@@ -671,7 +730,7 @@ func (s *Service) executeTask(taskID, taskName, query, execID string) {
 				Owner: o.Owner, DisplayName: o.DisplayName, Avatar: o.Avatar,
 			})
 		}
-		s.client.SetOfficialOrgs(clientOrgs)
+		client.SetOfficialOrgs(clientOrgs)
 		appendLog("info", fmt.Sprintf("已加载官方组织 %d 个（动态配置）", len(clientOrgs)))
 	}
 	progress(5, "读取爬虫配置")
@@ -694,7 +753,7 @@ func (s *Service) executeTask(taskID, taskName, query, execID string) {
 	repos := splitRepos(cfg.OfficialRepos)
 	// 自动发现官方组织的技能仓库，与官方组织挂钩（名称含 skill/agent/mcp 优先，否则取高星仓库）
 	if len(orgOwners) > 0 {
-		discovered := discoverOfficialRepos(s.client, orgOwners)
+		discovered := discoverOfficialRepos(client, orgOwners)
 		if len(discovered) > 0 {
 			repos = append(repos, discovered...)
 			appendLog("info", fmt.Sprintf("自动发现官方组织技能仓库 %d 个（与官方组织挂钩）", len(discovered)))
@@ -719,8 +778,14 @@ func (s *Service) executeTask(taskID, taskName, query, execID string) {
 		},
 	}
 	appendLog("info", "开始抓取 GitHub 仓库")
-	skills, failures, err := s.client.CrawlDetailed(opts)
+	skills, failures, err := client.CrawlDetailed(opts)
 	if err != nil {
+		// 手动停止：爬虫客户端被取消，标记为已停止（而非失败）
+		if ctx.Err() != nil || client.IsCancelled() {
+			finish(domain.TaskStopped, "warn", "任务已被手动停止")
+			_ = s.repo.UpdateTask(taskID, map[string]any{"status": domain.TaskWaiting})
+			return
+		}
 		finish(domain.TaskFailed, "err", "任务执行失败："+err.Error())
 		_ = s.repo.UpdateTask(taskID, map[string]any{"status": domain.TaskFailed, "fail_count": increment(s, taskID, "fail_count")})
 		return

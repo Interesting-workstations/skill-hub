@@ -10,12 +10,26 @@ export default function ExecutionListPage() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
 
-  useEffect(() => {
+  const load = () => {
     crawlerApi.listExecutions().then((r) => {
       setRecords(r);
       setLoading(false);
     });
-  }, []);
+  };
+
+  useEffect(load, []);
+
+  // 停止运行中的执行（后端取消爬虫 goroutine 并标记 stopped）
+  const stopExecution = (e: ExecutionRecord) => {
+    if (!window.confirm(`确定停止执行「${e.taskName}」吗？`)) return;
+    crawlerApi.stopExecution(e.id).then(() => load());
+  };
+
+  // 删除执行记录
+  const deleteExecution = (e: ExecutionRecord) => {
+    if (!window.confirm(`确定删除执行记录「${e.taskName}」吗？删除后不可恢复。`)) return;
+    crawlerApi.deleteExecution(e.id).then(() => load());
+  };
 
   const columns: Column<ExecutionRecord>[] = [
     {
@@ -75,7 +89,13 @@ export default function ExecutionListPage() {
       key: "action",
       title: "操作",
       render: (e) => (
-        <Link to={`/crawler/executions/${e.id}`} className="btn-link">查看详情</Link>
+        <div className="ops">
+          <Link to={`/crawler/executions/${e.id}`} className="btn-link">查看详情</Link>
+          {e.status === "running" && (
+            <button className="btn-link danger" onClick={() => stopExecution(e)}>停止</button>
+          )}
+          <button className="btn-link danger" onClick={() => deleteExecution(e)}>删除</button>
+        </div>
       ),
     },
   ];

@@ -76,6 +76,16 @@ export const crawlerApi = {
     return http.get<ExecutionRecord>(`${base}/executions/${encodeURIComponent(id)}`);
   },
 
+  /** 停止执行记录（取消运行中的爬虫） */
+  stopExecution(id: string): Promise<void> {
+    return http.post<void>(`${base}/executions/${encodeURIComponent(id)}/stop`);
+  },
+
+  /** 删除执行记录 */
+  deleteExecution(id: string): Promise<void> {
+    return http.delete<void>(`${base}/executions/${encodeURIComponent(id)}`);
+  },
+
   /** 获取 WebSocket 长连接的一次性票据（避免把 Token 放进 URL） */
   wsTicket(execId: string): Promise<{ ticket: string }> {
     return http.post<{ ticket: string }>(`${base}/ws-ticket`, { execId });

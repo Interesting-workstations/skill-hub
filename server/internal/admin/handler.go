@@ -50,6 +50,8 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	// 执行记录
 	h.protected(mux, "GET /api/v1/admin/executions", h.listExecutions)
 	h.protected(mux, "GET /api/v1/admin/executions/{id}", h.getExecution)
+	h.protected(mux, "POST /api/v1/admin/executions/{id}/stop", h.stopExecution)
+	h.protected(mux, "DELETE /api/v1/admin/executions/{id}", h.deleteExecution)
 
 	// 失败任务
 	h.protected(mux, "GET /api/v1/admin/failures", h.listFailures)
@@ -408,6 +410,24 @@ func (h *Handler) getExecution(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	response.OK(w, record)
+}
+
+// stopExecution 停止一次执行（取消运行中的爬虫，标记执行记录为已停止）。
+func (h *Handler) stopExecution(w http.ResponseWriter, r *http.Request) {
+	if err := h.svc.StopExecution(r.PathValue("id")); err != nil {
+		response.Fail(w, http.StatusInternalServerError, 50001, "系统错误")
+		return
+	}
+	response.OK(w, map[string]string{"message": "已停止"})
+}
+
+// deleteExecution 删除一条执行记录（仍在运行会先取消）。
+func (h *Handler) deleteExecution(w http.ResponseWriter, r *http.Request) {
+	if err := h.svc.DeleteExecution(r.PathValue("id")); err != nil {
+		response.Fail(w, http.StatusInternalServerError, 50001, "系统错误")
+		return
+	}
+	response.OK(w, map[string]string{"message": "已删除"})
 }
 
 // ---------- 执行实时推送（WebSocket）----------
