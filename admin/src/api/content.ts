@@ -1,7 +1,13 @@
 /** 内容 / 数据管理 API —— 对接 skill-hub 后端（/api/v1/admin），全部由 Go 提供。 */
 
 import { http } from "../core/http";
-import type { Article, CrawledDataItem, DataStatus, SeoConfig, SiteConfig } from "../types";
+import type { Article, CrawledDataItem, DataStatus, SeoConfig, SiteConfig, Sponsor } from "../types";
+
+/** 赞助商表单输入（不含 id/clicks/createdAt 等后端生成字段） */
+export type SponsorInput = Pick<
+  Sponsor,
+  "name" | "logo" | "descriptionZh" | "descriptionEn" | "url" | "position" | "enabled" | "sortOrder"
+>;
 
 /** 导出结果（后端生成文本内容） */
 export interface ExportResult {
@@ -58,5 +64,19 @@ export const contentApi = {
   },
   saveSiteConfig(config: SiteConfig): Promise<SiteConfig> {
     return http.put<SiteConfig>(`${base}/site-config`, config);
+  },
+
+  /* ---- 赞助商 ---- */
+  listSponsors(): Promise<Sponsor[]> {
+    return http.get<Sponsor[]>(`${base}/sponsors`);
+  },
+  createSponsor(input: SponsorInput): Promise<Sponsor> {
+    return http.post<Sponsor>(`${base}/sponsors`, input);
+  },
+  updateSponsor(id: string, input: SponsorInput): Promise<Sponsor> {
+    return http.put<Sponsor>(`${base}/sponsors/${encodeURIComponent(id)}`, input);
+  },
+  deleteSponsor(id: string): Promise<void> {
+    return http.delete<void>(`${base}/sponsors/${encodeURIComponent(id)}`);
   },
 };

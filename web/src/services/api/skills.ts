@@ -1,6 +1,6 @@
 // 技能资源库 API 模块：封装后端接口，组件只依赖这些函数。
 import { request, API_BASE_URL } from "./client";
-import type { Article, Author, AuthorDetail, Category, SeoConfig, SiteConfig, Skill, Stats } from "../../data/types";
+import type { Article, Author, AuthorDetail, Category, SeoConfig, SiteConfig, Skill, Sponsor, Stats } from "../../data/types";
 
 export interface SkillQuery {
   category?: string;
@@ -85,6 +85,19 @@ export function fetchSiteConfig(): Promise<SiteConfig> {
 /** GET /api/v1/seo */
 export function fetchSeo(): Promise<SeoConfig> {
   return request<SeoConfig>("/seo");
+}
+
+/** GET /api/v1/sponsors —— 获取启用中的赞助商（position: home|sidebar） */
+export function fetchSponsors(position?: string): Promise<Sponsor[]> {
+  const qs = position ? `?position=${encodeURIComponent(position)}` : "";
+  return request<Sponsor[]>(`/sponsors${qs}`);
+}
+
+/** POST /api/v1/sponsors/:id/click —— 赞助商点击上报（fire-and-forget） */
+export function reportSponsorClick(id: string): void {
+  void fetch(`${API_BASE_URL}/sponsors/${encodeURIComponent(id)}/click`, {
+    method: "POST",
+  }).catch(() => {});
 }
 
 /** POST /api/v1/skills/submit —— 提交技能 */

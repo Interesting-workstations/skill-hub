@@ -886,6 +886,63 @@ func (s *Service) DeleteArticle(id string) error {
 	return s.repo.DeleteArticle(id)
 }
 
+// ---------- 赞助商 ----------
+
+func (s *Service) ListSponsors() ([]domain.Sponsor, error) {
+	return s.repo.ListSponsors()
+}
+
+func (s *Service) CreateSponsor(input domain.Sponsor) (domain.Sponsor, error) {
+	sp := domain.Sponsor{
+		ID:            newID("spn"),
+		Name:          input.Name,
+		Logo:          input.Logo,
+		DescriptionZh: input.DescriptionZh,
+		DescriptionEn: input.DescriptionEn,
+		URL:           input.URL,
+		Position:      normalizePosition(input.Position),
+		Enabled:       input.Enabled,
+		SortOrder:     input.SortOrder,
+	}
+	return sp, s.repo.CreateSponsor(&sp)
+}
+
+func (s *Service) UpdateSponsor(id string, input domain.Sponsor) (domain.Sponsor, error) {
+	if id == "" {
+		return domain.Sponsor{}, fmt.Errorf("赞助商 ID 为空")
+	}
+	sp := domain.Sponsor{
+		ID:            id,
+		Name:          input.Name,
+		Logo:          input.Logo,
+		DescriptionZh: input.DescriptionZh,
+		DescriptionEn: input.DescriptionEn,
+		URL:           input.URL,
+		Position:      normalizePosition(input.Position),
+		Enabled:       input.Enabled,
+		SortOrder:     input.SortOrder,
+	}
+	return sp, s.repo.UpdateSponsor(id, &sp)
+}
+
+func (s *Service) DeleteSponsor(id string) error {
+	return s.repo.DeleteSponsor(id)
+}
+
+func (s *Service) IncrSponsorClicks(id string) error {
+	return s.repo.IncrSponsorClicks(id)
+}
+
+// normalizePosition 归一化展示位置（home / sidebar / both，非法值回退 home）。
+func normalizePosition(p string) string {
+	switch p {
+	case "sidebar", "both":
+		return p
+	default:
+		return "home"
+	}
+}
+
 func (s *Service) GetSeo() (domain.SeoConfig, error)         { return s.repo.GetSeo() }
 func (s *Service) SaveSeo(c domain.SeoConfig) error          { return s.repo.SaveSeo(c) }
 func (s *Service) GetSiteConfig() (domain.SiteConfig, error) { return s.repo.GetSiteConfig() }

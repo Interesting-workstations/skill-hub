@@ -1,12 +1,13 @@
 import { useParams, Link } from "react-router-dom";
-import { useRef, useCallback } from "react";
+import { useRef, useCallback, useEffect, useState } from "react";
 import SkillCard from "../../components/skill/SkillCard";
 import MarkdownContent from "../../components/shared/MarkdownContent";
 import { sectionEnter, buttonClick, panelEnterRight } from "../../animations";
 import { usePageAnimation } from "../../hooks/usePageAnimation";
 import { usePageMeta } from "../../hooks/usePageMeta";
 import { useSkill, useSkills, useCategories } from "../../hooks/useSkillData";
-import { skillDownloadUrl } from "../../services/api/skills";
+import { skillDownloadUrl, fetchSponsors, reportSponsorClick } from "../../services/api/skills";
+import type { Sponsor } from "../../data/types";
 import PageLoading from "../../components/shared/PageLoading";
 import { useI18n } from "../../i18n";
 import "./SkillDetailPage.css";
@@ -14,7 +15,9 @@ import "./SkillDetailPage.css";
 export default function SkillDetailPage() {
   const { skillId } = useParams<{ skillId: string }>();
   const { data: skill, loading } = useSkill(skillId);
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  // 侧边栏赞助商（后台配置，position=sidebar；无数据时保留「投放广告」占位）
+  const [sidebarSponsors, setSidebarSponsors] = useState<Sponsor[]>([]);
   // 同作者的其他技能（skill 未就绪时不请求）
   const { data: authorSkillsData } = useSkills(skill ? { author: skill.author } : null);
   const authorSkills = (authorSkillsData ?? []).filter((s) => s.id !== skill?.id);
@@ -23,6 +26,25 @@ export default function SkillDetailPage() {
   const categorySlugs = new Set((categoryList ?? []).map((c) => c.slug));
   const sidebarRef = useRef<HTMLElement>(null);
   const copyBtnRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    let alive = true;
+    fetchSponsors("sidebar")
+      .then((list) => {
+        if (alive) setSidebarSponsors(list);
+      })
+      .catch(() => {
+        if (alive) setSidebarSponsors([]);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const sponsorDesc = (s: Sponsor) => {
+    if (lang === "zh") return s.descriptionZh || s.descriptionEn;
+    return s.descriptionEn || s.descriptionZh;
+  };
 
   const handleCopy = useCallback(() => {
     if (skill?.installCommand) {
@@ -160,12 +182,36 @@ export default function SkillDetailPage() {
 
         {/* Sidebar */}
         <aside className="detail-sidebar" ref={sidebarRef}>
-          {/* Ad placeholder */}
-          <div className="sidebar-ad">
-            <p className="sidebar-ad-text">
-              {t("detail.advertise")}<a href="#">{t("detail.contactUs")}</a>
-            </p>
-          </div>
+          {/* 赞助位：有后台配置的侧边栏赞助商时展示卡片，否则保留「投放广告」占位 */}
+          {sidebarSponsors.length > 0 ? (
+            <div className="sidebar-sponsors">
+              {sidebarSponsors.map((s) => (
+                <a
+                  key={s.id}
+                  href={s.url}
+                  className="sidebar-sponsor"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => reportSponsorClick(s.id)}
+                >
+                  <div className="sidebar-sponsor-head">
+                    <span className="sidebar-sponsor-logo">{s.logo || "🪧"}</span>
+                    <div>
+                      <h4 className="sidebar-sponsor-name">{s.name}</h4>
+                      <span className="sponsor-badge">{t("sponsor.badge")}</span>
+                    </div>
+                  </div>
+                  <p className="sidebar-sponsor-desc">{sponsorDesc(s)}</p>
+                </a>
+              ))}
+            </div>
+          ) : (
+            <div className="sidebar-ad">
+              <p className="sidebar-ad-text">
+                {t("detail.advertise")}<a href="#">{t("detail.contactUs")}</a>
+              </p>
+            </div>
+          )}
 
           {/* More from author */}
           {authorSkills.length > 0 && (

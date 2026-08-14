@@ -265,6 +265,55 @@
   color: var(--color-primary);
 }
 
+/* 侧边栏赞助商卡片 */
+.sidebar-sponsors {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.sidebar-sponsor {
+  display: block;
+  padding: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  text-decoration: none;
+  background: var(--color-surface);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.sidebar-sponsor:hover {
+  border-color: var(--color-primary);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+}
+
+.sidebar-sponsor-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.sidebar-sponsor-logo {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.sidebar-sponsor-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0 0 4px;
+}
+
+.sidebar-sponsor-desc {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+  margin: 0;
+}
+
 .sidebar-more h3 {
   font-size: 16px;
   font-weight: 600;

@@ -115,6 +115,27 @@ type SiteConfig struct {
 	ContactEmail string `json:"contactEmail"`
 }
 
+// Sponsor 官网赞助商 / 广告位内容。
+type Sponsor struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	// Logo 赞助商标识（emoji 或图片 URL）。
+	Logo string `json:"logo"`
+	// DescriptionZh / DescriptionEn 中英文描述（官网按当前语言展示对应文案）。
+	DescriptionZh string `json:"descriptionZh"`
+	DescriptionEn string `json:"descriptionEn"`
+	// URL 点击跳转链接。
+	URL string `json:"url"`
+	// Position 展示位置：home（首页横幅）/ sidebar（详情页侧边栏）/ both。
+	Position string `json:"position"`
+	Enabled  bool   `json:"enabled"`
+	// SortOrder 排序值（越小越靠前）。
+	SortOrder int `json:"sortOrder"`
+	// Clicks 点击次数（公开接口上报 +1）。
+	Clicks    int    `json:"clicks"`
+	CreatedAt string `json:"createdAt"`
+}
+
 // AdminUser 管理员账号（单管理员）。
 type AdminUser struct {
 	Username    string `json:"username"`

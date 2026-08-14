@@ -16,6 +16,7 @@ import CategoryPage from "./pages/content/CategoryPage";
 import HomepagePage from "./pages/content/HomepagePage";
 import ArticlePage from "./pages/content/ArticlePage";
 import SeoPage from "./pages/content/SeoPage";
+import SponsorsPage from "./pages/content/SponsorsPage";
 import AdminSettingsPage from "./pages/system/AdminSettingsPage";
 import SiteSettingsPage from "./pages/system/SiteSettingsPage";
 
@@ -53,6 +54,7 @@ export default function App() {
             <Route path="content/categories" element={<CategoryPage />} />
             <Route path="content/homepage" element={<HomepagePage />} />
             <Route path="content/articles" element={<ArticlePage />} />
+            <Route path="content/sponsors" element={<SponsorsPage />} />
             <Route path="content/seo" element={<SeoPage />} />
             <Route path="system/admin" element={<AdminSettingsPage />} />
             <Route path="system/settings" element={<SiteSettingsPage />} />

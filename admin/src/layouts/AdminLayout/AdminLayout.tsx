@@ -27,6 +27,7 @@ const MENU: MenuItem[] = [
   { path: "/content/categories", label: "分类管理", icon: "📑" },
   { path: "/content/homepage", label: "首页内容", icon: "🏠" },
   { path: "/content/articles", label: "文章管理", icon: "📝" },
+  { path: "/content/sponsors", label: "赞助管理", icon: "🪧" },
   { path: "/content/seo", label: "SEO 配置", icon: "🔍" },
   { section: "系统设置" },
   { path: "/system/admin", label: "管理员设置", icon: "👤" },

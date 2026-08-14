@@ -72,6 +72,14 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	h.protected(mux, "PUT /api/v1/admin/articles/{id}", h.updateArticle)
 	h.protected(mux, "DELETE /api/v1/admin/articles/{id}", h.deleteArticle)
 
+	// 赞助商：公开接口（官网渲染 / 点击上报）+ 后台管理
+	mux.HandleFunc("GET /api/v1/sponsors", h.listPublicSponsors)
+	mux.HandleFunc("POST /api/v1/sponsors/{id}/click", h.incrSponsorClick)
+	h.protected(mux, "GET /api/v1/admin/sponsors", h.listSponsors)
+	h.protected(mux, "POST /api/v1/admin/sponsors", h.createSponsor)
+	h.protected(mux, "PUT /api/v1/admin/sponsors/{id}", h.updateSponsor)
+	h.protected(mux, "DELETE /api/v1/admin/sponsors/{id}", h.deleteSponsor)
+
 	// SEO / 站点
 	h.protected(mux, "GET /api/v1/admin/seo", h.getSeo)
 	h.protected(mux, "PUT /api/v1/admin/seo", h.saveSeo)
@@ -563,6 +571,84 @@ func (h *Handler) updateArticle(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) deleteArticle(w http.ResponseWriter, r *http.Request) {
 	if err := h.svc.DeleteArticle(r.PathValue("id")); err != nil {
+		response.Fail(w, http.StatusInternalServerError, 50001, "系统错误")
+		return
+	}
+	response.OK(w, map[string]string{"message": "已删除"})
+}
+
+// ---------- 赞助商 ----------
+
+// listPublicSponsors 官网公开接口：返回启用中的赞助商。
+// GET /api/v1/sponsors?position=home|sidebar（缺省返回全部位置的启用赞助商）
+func (h *Handler) listPublicSponsors(w http.ResponseWriter, r *http.Request) {
+	position := r.URL.Query().Get("position")
+	all, err := h.svc.ListSponsors()
+	if err != nil {
+		response.Fail(w, http.StatusInternalServerError, 50001, "系统错误")
+		return
+	}
+	out := make([]domain.Sponsor, 0, len(all))
+	for _, s := range all {
+		if !s.Enabled {
+			continue
+		}
+		if position != "" && s.Position != position && s.Position != "both" {
+			continue
+		}
+		out = append(out, s)
+	}
+	response.OK(w, out)
+}
+
+// incrSponsorClick 官网点击上报（公开）。
+func (h *Handler) incrSponsorClick(w http.ResponseWriter, r *http.Request) {
+	if err := h.svc.IncrSponsorClicks(r.PathValue("id")); err != nil {
+		response.Fail(w, http.StatusInternalServerError, 50001, "系统错误")
+		return
+	}
+	response.OK(w, map[string]bool{"ok": true})
+}
+
+func (h *Handler) listSponsors(w http.ResponseWriter, _ *http.Request) {
+	list, err := h.svc.ListSponsors()
+	if err != nil {
+		response.Fail(w, http.StatusInternalServerError, 50001, "系统错误")
+		return
+	}
+	response.OK(w, list)
+}
+
+func (h *Handler) createSponsor(w http.ResponseWriter, r *http.Request) {
+	var s domain.Sponsor
+	if err := json.NewDecoder(r.Body).Decode(&s); err != nil || s.Name == "" {
+		response.Fail(w, http.StatusBadRequest, 40001, "名称必填")
+		return
+	}
+	created, err := h.svc.CreateSponsor(s)
+	if err != nil {
+		response.Fail(w, http.StatusInternalServerError, 50001, "系统错误")
+		return
+	}
+	response.OK(w, created)
+}
+
+func (h *Handler) updateSponsor(w http.ResponseWriter, r *http.Request) {
+	var s domain.Sponsor
+	if err := json.NewDecoder(r.Body).Decode(&s); err != nil || s.Name == "" {
+		response.Fail(w, http.StatusBadRequest, 40001, "名称必填")
+		return
+	}
+	updated, err := h.svc.UpdateSponsor(r.PathValue("id"), s)
+	if err != nil {
+		response.Fail(w, http.StatusInternalServerError, 50001, "系统错误")
+		return
+	}
+	response.OK(w, updated)
+}
+
+func (h *Handler) deleteSponsor(w http.ResponseWriter, r *http.Request) {
+	if err := h.svc.DeleteSponsor(r.PathValue("id")); err != nil {
 		response.Fail(w, http.StatusInternalServerError, 50001, "系统错误")
 		return
 	}

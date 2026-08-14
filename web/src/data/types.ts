@@ -79,3 +79,20 @@ export interface SeoConfig {
   keywords: string;
   ogImage: string;
 }
+
+/** 赞助商（admin 管理，官网按位置渲染；中英描述按语言展示） */
+export interface Sponsor {
+  id: string;
+  name: string;
+  /** emoji 或图片 URL */
+  logo: string;
+  descriptionZh: string;
+  descriptionEn: string;
+  url: string;
+  /** home（首页横幅）/ sidebar（详情页侧边栏）/ both */
+  position: string;
+  enabled: boolean;
+  sortOrder: number;
+  clicks: number;
+  createdAt: string;
+}

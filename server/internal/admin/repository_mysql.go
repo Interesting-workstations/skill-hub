@@ -63,6 +63,13 @@ type Repository interface {
 	// ListExportSkills 返回全部技能完整数据（供导出 JSON/CSV/Markdown）。
 	ListExportSkills() ([]domain.Skill, error)
 
+	// 赞助商
+	ListSponsors() ([]domain.Sponsor, error)
+	CreateSponsor(s *domain.Sponsor) error
+	UpdateSponsor(id string, s *domain.Sponsor) error
+	DeleteSponsor(id string) error
+	IncrSponsorClicks(id string) error
+
 	GetSeo() (domain.SeoConfig, error)
 	SaveSeo(s domain.SeoConfig) error
 
@@ -225,6 +232,19 @@ func (r *mysqlRepo) migrate() error {
 			views INT NOT NULL DEFAULT 0,
 			updated_at VARCHAR(16) NOT NULL,
 			content MEDIUMTEXT NOT NULL
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+		`CREATE TABLE IF NOT EXISTS sponsors (
+			id VARCHAR(64) PRIMARY KEY,
+			name VARCHAR(128) NOT NULL,
+			logo VARCHAR(255) NOT NULL DEFAULT '',
+			description_zh TEXT NOT NULL,
+			description_en TEXT NOT NULL,
+			url VARCHAR(500) NOT NULL DEFAULT '',
+			position VARCHAR(16) NOT NULL DEFAULT 'home',
+			enabled TINYINT(1) NOT NULL DEFAULT 1,
+			sort_order INT NOT NULL DEFAULT 0,
+			clicks INT NOT NULL DEFAULT 0,
+			created_at VARCHAR(32) NOT NULL
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 		`CREATE TABLE IF NOT EXISTS seo_config (
 			id TINYINT PRIMARY KEY,
@@ -720,6 +740,70 @@ func (r *mysqlRepo) UpdateArticle(id string, a *domain.Article) error {
 
 func (r *mysqlRepo) DeleteArticle(id string) error {
 	_, err := r.db.Exec(`DELETE FROM articles WHERE id = ?`, id)
+	return err
+}
+
+// ---------- 赞助商 ----------
+
+func (r *mysqlRepo) ListSponsors() ([]domain.Sponsor, error) {
+	rows, err := r.db.Query(`SELECT id, name, logo, description_zh, description_en, url,
+		position, enabled, sort_order, clicks, created_at
+		FROM sponsors ORDER BY sort_order ASC, created_at DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]domain.Sponsor, 0)
+	for rows.Next() {
+		var s domain.Sponsor
+		var enabled int
+		if err := rows.Scan(&s.ID, &s.Name, &s.Logo, &s.DescriptionZh, &s.DescriptionEn,
+			&s.URL, &s.Position, &enabled, &s.SortOrder, &s.Clicks, &s.CreatedAt); err != nil {
+			return nil, err
+		}
+		s.Enabled = enabled == 1
+		out = append(out, s)
+	}
+	return out, rows.Err()
+}
+
+func (r *mysqlRepo) CreateSponsor(s *domain.Sponsor) error {
+	enabled := 0
+	if s.Enabled {
+		enabled = 1
+	}
+	if s.CreatedAt == "" {
+		s.CreatedAt = today()
+	}
+	_, err := r.db.Exec(
+		`INSERT INTO sponsors(id, name, logo, description_zh, description_en, url,
+			position, enabled, sort_order, clicks, created_at)
+		 VALUES(?,?,?,?,?,?,?,?,?,0,?)`,
+		s.ID, s.Name, s.Logo, s.DescriptionZh, s.DescriptionEn, s.URL,
+		s.Position, enabled, s.SortOrder, s.CreatedAt)
+	return err
+}
+
+func (r *mysqlRepo) UpdateSponsor(id string, s *domain.Sponsor) error {
+	enabled := 0
+	if s.Enabled {
+		enabled = 1
+	}
+	_, err := r.db.Exec(
+		`UPDATE sponsors SET name=?, logo=?, description_zh=?, description_en=?, url=?,
+			position=?, enabled=?, sort_order=? WHERE id = ?`,
+		s.Name, s.Logo, s.DescriptionZh, s.DescriptionEn, s.URL,
+		s.Position, enabled, s.SortOrder, id)
+	return err
+}
+
+func (r *mysqlRepo) DeleteSponsor(id string) error {
+	_, err := r.db.Exec(`DELETE FROM sponsors WHERE id = ?`, id)
+	return err
+}
+
+func (r *mysqlRepo) IncrSponsorClicks(id string) error {
+	_, err := r.db.Exec(`UPDATE sponsors SET clicks = clicks + 1 WHERE id = ?`, id)
 	return err
 }
 
