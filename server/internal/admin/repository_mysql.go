@@ -18,7 +18,8 @@ import (
 )
 
 // DataItem 抓取数据（含审核状态）。
-type DataItem struct {	ID          string `json:"id"`
+type DataItem struct {
+	ID          string `json:"id"`
 	Name        string `json:"name"`
 	Author      string `json:"author"`
 	Category    string `json:"category"`

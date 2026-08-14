@@ -14,8 +14,10 @@ import (
 type Repository interface {
 	// AllSkills 返回全部技能（精选 + 各分类）。
 	AllSkills() []domain.Skill
-	// SkillByID 按 ID 查询技能。
+	// SkillByID 按 ID 查询已发布技能（官网可见）。
 	SkillByID(id string) (domain.Skill, bool)
+	// SkillByIDAny 按 ID 查询技能（不限状态，供内部查重/管理使用）。
+	SkillByIDAny(id string) (domain.Skill, bool)
 	// AllAuthors 返回全部作者。
 	AllAuthors() []domain.Author
 	// AllCategories 返回全部分类（含分类下技能）。
@@ -71,6 +73,10 @@ func (r *memoryRepo) SkillByID(id string) (domain.Skill, bool) {
 	return domain.Skill{}, false
 }
 
+// SkillByIDAny 内存实现与 SkillByID 相同（无状态概念）。
+func (r *memoryRepo) SkillByIDAny(id string) (domain.Skill, bool) {
+	return r.SkillByID(id)
+}
 func (r *memoryRepo) AllAuthors() []domain.Author {
 	authors := make([]domain.Author, len(r.store.Authors))
 	copy(authors, r.store.Authors)

@@ -264,11 +264,11 @@ func insertSkill(tx *sql.Tx, s domain.Skill) error {
 	return err
 }
 
-// AllSkills 返回全部技能。
+// AllSkills 返回全部已发布技能（未审核/未发布的记录不出现在官网）。
 func (r *mysqlRepo) AllSkills() []domain.Skill {
 	rows, err := r.db.Query(`SELECT id, name, author, description, category,
 		download_url, is_official, is_featured, install_command, github_url,
-		github_stars, license, skill_path, tags, content FROM skills`)
+		github_stars, license, skill_path, tags, content FROM skills WHERE data_status = 'published'`)
 	if err != nil {
 		return nil
 	}
@@ -283,8 +283,17 @@ func (r *mysqlRepo) AllSkills() []domain.Skill {
 	return skills
 }
 
-// SkillByID 按 ID 查询技能。
+// SkillByID 按 ID 查询已发布技能（未发布的记录官网不可见）。
 func (r *mysqlRepo) SkillByID(id string) (domain.Skill, bool) {
+	row := r.db.QueryRow(`SELECT id, name, author, description, category,
+		download_url, is_official, is_featured, install_command, github_url,
+		github_stars, license, skill_path, tags, content FROM skills WHERE id = ? AND data_status = 'published'`, id)
+	s, ok := scanSkill(row)
+	return s, ok
+}
+
+// SkillByIDAny 按 ID 查询技能（不限状态，供用户提交技能时 ID 查重）。
+func (r *mysqlRepo) SkillByIDAny(id string) (domain.Skill, bool) {
 	row := r.db.QueryRow(`SELECT id, name, author, description, category,
 		download_url, is_official, is_featured, install_command, github_url,
 		github_stars, license, skill_path, tags, content FROM skills WHERE id = ?`, id)
@@ -292,15 +301,15 @@ func (r *mysqlRepo) SkillByID(id string) (domain.Skill, bool) {
 	return s, ok
 }
 
-// AllAuthors 返回全部作者；SkillCount 为该作者下实际技能数、
-// OfficialSkills 为官方技能数（均实时统计）。
+// AllAuthors 返回全部作者；SkillCount 为该作者下已发布技能数、
+// OfficialSkills 为官方技能数（均实时统计，只统计已发布）。
 func (r *mysqlRepo) AllAuthors() []domain.Author {
 	rows, err := r.db.Query(`
 		SELECT a.slug, a.name, a.avatar,
 			COUNT(s.id),
 			COALESCE(SUM(s.is_official), 0)
 		FROM authors a
-		LEFT JOIN skills s ON s.author = a.slug
+		LEFT JOIN skills s ON s.author = a.slug AND s.data_status = 'published'
 		GROUP BY a.slug, a.name, a.avatar
 		ORDER BY a.slug`)
 	if err != nil {
@@ -319,12 +328,12 @@ func (r *mysqlRepo) AllAuthors() []domain.Author {
 	return authors
 }
 
-// AllCategories 返回全部分类；count 为该分类下实际技能数（实时统计）。
+// AllCategories 返回全部分类；count 为该分类下已发布技能数（实时统计）。
 func (r *mysqlRepo) AllCategories() []domain.Category {
 	rows, err := r.db.Query(`
 		SELECT c.slug, c.name, COUNT(s.id)
 		FROM categories c
-		LEFT JOIN skills s ON s.category = c.slug
+		LEFT JOIN skills s ON s.category = c.slug AND s.data_status = 'published'
 		GROUP BY c.slug, c.name
 		ORDER BY c.slug`)
 	if err != nil {
@@ -355,6 +364,7 @@ func (r *mysqlRepo) OfficialOrgSummaries() []domain.OfficialOrgSummary {
 		LEFT JOIN (
 			SELECT author, SUM(is_official) AS official_count
 			FROM skills
+			WHERE data_status = 'published'
 			GROUP BY author
 		) agg ON agg.author = o.display_name
 		WHERE o.enabled = 1
@@ -389,7 +399,7 @@ func (r *mysqlRepo) OfficialOrgSummaries() []domain.OfficialOrgSummary {
 
 func (r *mysqlRepo) skillsByCategory(slug string) []domain.Skill {
 	rows, err := r.db.Query(`SELECT id, name, author, description, category, download_url, is_official, is_featured,
-		install_command, github_url, github_stars, license, skill_path, tags, content FROM skills WHERE category = ?`, slug)
+		install_command, github_url, github_stars, license, skill_path, tags, content FROM skills WHERE category = ? AND data_status = 'published'`, slug)
 	if err != nil {
 		return nil
 	}

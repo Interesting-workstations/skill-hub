@@ -257,7 +257,7 @@ func (s *Service) SubmitSkill(in SubmitSkillInput) (domain.Skill, error) {
 	base := Slugify(in.Author) + "-" + Slugify(in.Name)
 	id := base
 	for i := 2; ; i++ {
-		if _, ok := s.repo.SkillByID(id); !ok {
+		if _, ok := s.repo.SkillByIDAny(id); !ok {
 			break
 		}
 		id = fmt.Sprintf("%s-%d", base, i)

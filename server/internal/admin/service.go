@@ -66,9 +66,9 @@ type Service struct {
 	tokenVersions map[string]int          // username → token version（改密后 +1 全失效）
 	loginAttempts map[string][]int64      // ip → 登录尝试时间戳（滑动窗口限流）
 
-	execSubs  map[string]map[chan domain.ExecEvent]struct{} // execID → 订阅者（执行进度/日志推送）
-	wsTickets map[string]wsTicket                           // ticket → 一次性 WS 票据
-	execCancels map[string]context.CancelFunc                // execID → 取消函数（手动停止任务）
+	execSubs    map[string]map[chan domain.ExecEvent]struct{} // execID → 订阅者（执行进度/日志推送）
+	wsTickets   map[string]wsTicket                           // ticket → 一次性 WS 票据
+	execCancels map[string]context.CancelFunc                 // execID → 取消函数（手动停止任务）
 }
 
 // NewService 创建后台管理服务。
