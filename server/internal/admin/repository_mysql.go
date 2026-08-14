@@ -97,6 +97,12 @@ type Repository interface {
 	CountOfficial() (int, error)
 	CountAuthors() (int, error)
 	Stats() (domain.AdminStats, error)
+
+	// 官方组织（动态管理）
+	ListOfficialOrgs() ([]domain.OfficialOrg, error)
+	CreateOfficialOrg(o *domain.OfficialOrg) error
+	UpdateOfficialOrg(owner string, fields map[string]any) error
+	DeleteOfficialOrg(owner string) error
 }
 
 // AdminRecord 管理员账号记录（含安全相关字段；密码哈希不可逆存储）。
@@ -154,6 +160,10 @@ func NewMySQLRepository(dsn string) (Repository, error) {
 		return nil, err
 	}
 	if err := repo.seed(); err != nil {
+		db.Close()
+		return nil, err
+	}
+	if err := repo.seedOfficialOrgs(); err != nil {
 		db.Close()
 		return nil, err
 	}
@@ -270,6 +280,14 @@ func (r *mysqlRepo) migrate() error {
 			created_at VARCHAR(32) NOT NULL,
 			KEY idx_login_username (username),
 			KEY idx_login_created (created_at)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+		`CREATE TABLE IF NOT EXISTS official_orgs (
+			owner VARCHAR(100) PRIMARY KEY,
+			display_name VARCHAR(100) NOT NULL DEFAULT '',
+			avatar VARCHAR(32) NOT NULL DEFAULT '',
+			sort_order INT NOT NULL DEFAULT 0,
+			enabled TINYINT(1) NOT NULL DEFAULT 1,
+			created_at VARCHAR(16) NOT NULL DEFAULT ''
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 	}
 	for _, stmt := range stmts {
@@ -1116,5 +1134,162 @@ func (r *mysqlRepo) update(table, id string, fields map[string]any) error {
 	}
 	args = append(args, id)
 	_, err := r.db.Exec(fmt.Sprintf("UPDATE %s SET %s WHERE id = ?", table, strings.Join(cols, ", ")), args...)
+	return err
+}
+
+// ---------- 官方组织（动态管理） ----------
+
+// seedOfficialOrgs 表为空时预置默认官方组织列表（含大量知名组织）。
+func (r *mysqlRepo) seedOfficialOrgs() error {
+	var n int
+	if err := r.db.QueryRow(`SELECT COUNT(*) FROM official_orgs`).Scan(&n); err != nil {
+		return err
+	}
+	if n > 0 {
+		return nil
+	}
+	// owner, displayName, avatar, sortOrder
+	orgs := [][4]any{
+		{"anthropics", "Anthropic", "🅰️", 1},
+		{"openai", "OpenAI", "🤖", 2},
+		{"microsoft", "Microsoft", "🪟", 3},
+		{"google", "Google", "🇬", 4},
+		{"googlecloudplatform", "Google", "🇬", 4},
+		{"deepmind", "DeepMind", "🇬", 4},
+		{"vercel", "Vercel", "▲", 5},
+		{"github", "GitHub", "🐙", 6},
+		{"cloudflare", "Cloudflare", "☁️", 7},
+		{"figma", "Figma", "🎨", 8},
+		{"notion", "Notion", "📝", 9},
+		{"stripe", "Stripe", "💳", 10},
+		{"aws", "AWS", "☁️", 11},
+		{"aws-samples", "AWS", "☁️", 11},
+		{"sst", "SST", "▲", 12},
+		{"meta", "Meta", "🔵", 13},
+		{"facebook", "Meta", "🔵", 13},
+		{"huggingface", "Hugging Face", "🤗", 14},
+		{"ibm", "IBM", "🔷", 15},
+		{"oracle", "Oracle", "🟠", 16},
+		{"apple", "Apple", "🍎", 17},
+		{"netflix", "Netflix", "🎬", 18},
+		{"linkedin", "LinkedIn", "💼", 19},
+		{"amazon", "Amazon", "🛒", 20},
+		{"alibaba", "Alibaba", "🅰️", 21},
+		{"tencent", "Tencent", "🐧", 22},
+		{"baidu", "Baidu", "🐻", 23},
+		{"xai", "xAI", "🐦", 24},
+		{"mistralai", "Mistral AI", "🌀", 25},
+		{"cohere", "Cohere", "🌊", 26},
+		{"databricks", "Databricks", "🔥", 27},
+		{"snowflake", "Snowflake", "❄️", 28},
+		{"nvidia", "NVIDIA", "🟢", 29},
+		{"intel", "Intel", "🔵", 30},
+		{"amd", "AMD", "🔴", 31},
+		{"samsung", "Samsung", "🔷", 32},
+		{"bytedance", "ByteDance", "🎵", 33},
+		{"tiktok", "TikTok", "🎵", 33},
+		{"redhat", "Red Hat", "🧢", 34},
+		{"docker", "Docker", "🐳", 35},
+		{"vmware", "VMware", "🟠", 36},
+		{"salesforce", "Salesforce", "☁️", 37},
+		{"sap", "SAP", "🟡", 38},
+		{"uber", "Uber", "🚗", 39},
+		{"shopify", "Shopify", "🛍️", 40},
+		{"spotify", "Spotify", "🎧", 41},
+		{"airbnb", "Airbnb", "🏠", 42},
+		{"dropbox", "Dropbox", "📦", 43},
+		{"slack", "Slack", "💬", 44},
+		{"zoom", "Zoom", "📹", 45},
+		{"atlassian", "Atlassian", "🧩", 46},
+		{"gitlab", "GitLab", "🦊", 47},
+		{"hashicorp", "HashiCorp", "🏗️", 48},
+		{"mongodb", "MongoDB", "🍃", 49},
+		{"redis", "Redis", "🔴", 50},
+		{"neo4j", "Neo4j", "🟢", 51},
+		{"elastic", "Elastic", "🟡", 52},
+		{"datadog", "Datadog", "🐕", 53},
+		{"confluent", "Confluent", "🌊", 54},
+		{"pinecone", "Pinecone", "🌲", 55},
+		{"replicate", "Replicate", "🌀", 56},
+		{"langchain-ai", "LangChain", "🦜", 57},
+		{"wandb", "Weights & Biases", "📈", 58},
+		{"perplexity-ai", "Perplexity", "🔮", 59},
+		{"elevenlabs", "ElevenLabs", "🎙️", 60},
+		{"deepseek-ai", "DeepSeek", "🐋", 61},
+		{"qwenlm", "Qwen", "🐉", 62},
+		{"zhipuai", "Zhipu AI", "🧠", 63},
+		{"moonshotai", "Moonshot AI", "🌙", 64},
+		{"ai21labs", "AI21", "🌈", 65},
+		{"tiiuae", "TII", "🕌", 66},
+		{"scaleai", "Scale AI", "📐", 67},
+		{"run-ai", "Run.ai", "🏃", 68},
+		{"samba-nova", "SambaNova", "🦙", 69},
+		{"cerebras", "Cerebras", "🧠", 70},
+		{"groq", "Groq", "⚡", 71},
+		{"nomic-ai", "Nomic", "🧭", 72},
+		{"anthropic", "Anthropic", "🅰️", 1},
+	}
+	for _, o := range orgs {
+		if _, err := r.db.Exec(
+			`INSERT INTO official_orgs(owner, display_name, avatar, sort_order, enabled, created_at) VALUES(?,?,?,?,1,?)`,
+			o[0], o[1], o[2], o[3], today(),
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *mysqlRepo) ListOfficialOrgs() ([]domain.OfficialOrg, error) {
+	rows, err := r.db.Query(`SELECT owner, display_name, avatar, sort_order, enabled, created_at
+		FROM official_orgs ORDER BY sort_order, owner`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]domain.OfficialOrg, 0)
+	for rows.Next() {
+		var o domain.OfficialOrg
+		var enabled int
+		if err := rows.Scan(&o.Owner, &o.DisplayName, &o.Avatar, &o.SortOrder, &enabled, &o.CreatedAt); err != nil {
+			return nil, err
+		}
+		o.Enabled = enabled == 1
+		out = append(out, o)
+	}
+	return out, rows.Err()
+}
+
+func (r *mysqlRepo) CreateOfficialOrg(o *domain.OfficialOrg) error {
+	enabled := 0
+	if o.Enabled {
+		enabled = 1
+	}
+	if o.CreatedAt == "" {
+		o.CreatedAt = today()
+	}
+	_, err := r.db.Exec(
+		`INSERT INTO official_orgs(owner, display_name, avatar, sort_order, enabled, created_at) VALUES(?,?,?,?,?,?)`,
+		o.Owner, o.DisplayName, o.Avatar, o.SortOrder, enabled, o.CreatedAt)
+	return err
+}
+
+func (r *mysqlRepo) UpdateOfficialOrg(owner string, fields map[string]any) error {
+	if len(fields) == 0 {
+		return nil
+	}
+	cols := make([]string, 0, len(fields))
+	args := make([]any, 0, len(fields))
+	for k, v := range fields {
+		cols = append(cols, k+" = ?")
+		args = append(args, v)
+	}
+	args = append(args, owner)
+	_, err := r.db.Exec(fmt.Sprintf("UPDATE official_orgs SET %s WHERE owner = ?", strings.Join(cols, ", ")), args...)
+	return err
+}
+
+func (r *mysqlRepo) DeleteOfficialOrg(owner string) error {
+	_, err := r.db.Exec(`DELETE FROM official_orgs WHERE owner = ?`, owner)
 	return err
 }

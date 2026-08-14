@@ -207,3 +207,13 @@ export interface AdminUser {
   displayName: string;
   role: "admin";
 }
+
+/* ---------- 官方组织（动态管理） ---------- */
+export interface OfficialOrg {
+  owner: string;
+  displayName: string;
+  avatar: string;
+  sortOrder: number;
+  enabled: boolean;
+  createdAt: string;
+}

@@ -236,7 +236,7 @@ func (c *Client) buildSkill(repo Repo, skillName, mdPath string) (Skill, error) 
 	return Skill{
 		ID:             id,
 		Name:           TitleCase(name),
-		Author:         OfficialDisplayName(owner),
+		Author:         c.OfficialDisplayName(owner),
 		Description:    desc,
 		Tags:           inferTags(name, desc),
 		Category:       inferCategory(name, desc),
@@ -245,15 +245,27 @@ func (c *Client) buildSkill(repo Repo, skillName, mdPath string) (Skill, error) 
 		GithubURL:      repo.HTMLURL,
 		GithubStars:    formatStars(repo.Stars),
 		License:        license,
-		IsOfficial:     IsOfficialOrg(owner),
+		IsOfficial:     c.IsOfficial(owner),
 		SkillPath:      dir,
 		Content:        ParseContent(string(body)),
 	}, nil
 }
 
-// officialOrgs 官方组织及其在站点上展示的头像 emoji。
+// defaultOfficialOrgs 内置官方组织（owner → 展示信息）。
+// 爬虫启动时作为默认；后台可通过 official_orgs 表动态覆盖（Client.SetOfficialOrgs）。
+var defaultOfficialOrgs = buildDefaultOfficialOrgs()
+
+func buildDefaultOfficialOrgs() map[string]OrgInfo {
+	m := make(map[string]OrgInfo, len(officialOrgAvatars))
+	for owner, avatar := range officialOrgAvatars {
+		m[owner] = OrgInfo{Avatar: avatar, DisplayName: officialDisplayNames[owner]}
+	}
+	return m
+}
+
+// officialOrgAvatars 官方组织默认头像 emoji（GitHub owner → emoji）。
 // 爬取到的仓库 owner 在此列表内 → 官方技能；否则 → 个人/社区技能。
-var officialOrgs = map[string]string{
+var officialOrgAvatars = map[string]string{
 	"anthropics":          "🅰️",
 	"openai":              "🤖",
 	"microsoft":           "🪟",
@@ -289,29 +301,7 @@ var officialOrgs = map[string]string{
 	"anthropic":           "🅰️",
 }
 
-// IsOfficialOrg 判断仓库 owner 是否为官方组织。
-func IsOfficialOrg(owner string) bool {
-	_, ok := officialOrgs[strings.ToLower(owner)]
-	return ok
-}
-
-// OfficialAvatar 返回官方组织的头像 emoji；非官方组织返回空字符串。
-// 同时兼容 GitHub owner（anthropics）与展示名（Anthropic、Hugging Face）。
-func OfficialAvatar(owner string) string {
-	lower := strings.ToLower(owner)
-	if e, ok := officialOrgs[lower]; ok {
-		return e
-	}
-	// 展示名 → 组织名 → emoji（如 "Hugging Face" → huggingface → 🤗）
-	for org, display := range officialDisplayNames {
-		if strings.ToLower(display) == lower {
-			return officialOrgs[org]
-		}
-	}
-	return ""
-}
-
-// officialDisplayNames 官方组织在站点上的展示名（GitHub owner → 显示名）。
+// officialDisplayNames 官方组织默认展示名（GitHub owner → 显示名）。
 // 与 mcpservers.org 等站点的作者展示一致（如 anthropics → Anthropic）。
 var officialDisplayNames = map[string]string{
 	"anthropics":          "Anthropic",
@@ -348,10 +338,32 @@ var officialDisplayNames = map[string]string{
 	"snowflake":           "Snowflake",
 }
 
-// OfficialDisplayName 返回官方组织的展示名；非官方组织返回 GitHub 用户名本身。
+// IsOfficialOrg 判断仓库 owner 是否为内置默认官方组织。
+// 仅供 import 等外部工具使用；运行时爬虫使用 Client.IsOfficial（数据来自数据库动态配置）。
+func IsOfficialOrg(owner string) bool {
+	_, ok := defaultOfficialOrgs[strings.ToLower(owner)]
+	return ok
+}
+
+// OfficialAvatar 返回内置官方组织的头像 emoji；非官方组织返回空字符串。
+// 兼容 GitHub owner 与展示名（如 "Hugging Face"、"Anthropic"）。
+func OfficialAvatar(owner string) string {
+	lower := strings.ToLower(owner)
+	if info, ok := defaultOfficialOrgs[lower]; ok {
+		return info.Avatar
+	}
+	for _, info := range defaultOfficialOrgs {
+		if info.DisplayName != "" && strings.EqualFold(info.DisplayName, owner) {
+			return info.Avatar
+		}
+	}
+	return ""
+}
+
+// OfficialDisplayName 返回内置官方组织的展示名；非官方组织返回 GitHub 用户名本身。
 func OfficialDisplayName(owner string) string {
-	if n, ok := officialDisplayNames[strings.ToLower(owner)]; ok {
-		return n
+	if info, ok := defaultOfficialOrgs[strings.ToLower(owner)]; ok && info.DisplayName != "" {
+		return info.DisplayName
 	}
 	return owner
 }

@@ -13,18 +13,81 @@ import (
 // apiBase GitHub API 基地址（var 以便测试注入 mock server）。
 var apiBase = "https://api.github.com"
 
+// OrgInfo 官方组织的展示信息。
+type OrgInfo struct {
+	DisplayName string `json:"displayName"`
+	Avatar      string `json:"avatar"`
+}
+
+// OfficialOrg 官方组织（owner → 展示信息），用于从数据库动态注入爬虫。
+type OfficialOrg struct {
+	Owner       string `json:"owner"`
+	DisplayName string `json:"displayName"`
+	Avatar      string `json:"avatar"`
+}
+
 // Client GitHub API 客户端（认证可显著提升速率限制）。
 type Client struct {
 	token string
 	http  *http.Client
+	// officialOrgs 官方组织表（owner → 展示信息）；默认内置，可用 SetOfficialOrgs 动态覆盖。
+	officialOrgs map[string]OrgInfo
 }
 
 // NewClient 创建客户端；token 为空时以匿名方式请求（速率受限）。
 func NewClient(token string) *Client {
 	return &Client{
-		token: token,
-		http:  &http.Client{Timeout: 20 * time.Second},
+		token:        token,
+		http:         &http.Client{Timeout: 20 * time.Second},
+		officialOrgs: defaultOfficialOrgs,
 	}
+}
+
+// SetOfficialOrgs 注入动态官方组织列表（来自数据库，替换内置默认）。
+// 传入空列表时不生效（保留当前列表），避免误清空。
+func (c *Client) SetOfficialOrgs(orgs []OfficialOrg) {
+	if len(orgs) == 0 {
+		return
+	}
+	m := make(map[string]OrgInfo, len(orgs))
+	for _, o := range orgs {
+		owner := strings.ToLower(strings.TrimSpace(o.Owner))
+		if owner != "" {
+			m[owner] = OrgInfo{DisplayName: o.DisplayName, Avatar: o.Avatar}
+		}
+	}
+	if len(m) > 0 {
+		c.officialOrgs = m
+	}
+}
+
+// IsOfficial 判断仓库 owner 是否为官方组织。
+func (c *Client) IsOfficial(owner string) bool {
+	_, ok := c.officialOrgs[strings.ToLower(owner)]
+	return ok
+}
+
+// OfficialDisplayName 返回官方组织的展示名；非官方组织返回 GitHub 用户名本身。
+func (c *Client) OfficialDisplayName(owner string) string {
+	if info, ok := c.officialOrgs[strings.ToLower(owner)]; ok && info.DisplayName != "" {
+		return info.DisplayName
+	}
+	return owner
+}
+
+// OfficialAvatar 返回官方组织的头像 emoji；非官方组织返回空字符串。
+// 兼容 GitHub owner 与展示名（如 "Hugging Face"）两种输入。
+func (c *Client) OfficialAvatar(owner string) string {
+	lower := strings.ToLower(owner)
+	if info, ok := c.officialOrgs[lower]; ok {
+		return info.Avatar
+	}
+	for _, info := range c.officialOrgs {
+		if info.DisplayName != "" && strings.EqualFold(info.DisplayName, owner) {
+			return info.Avatar
+		}
+	}
+	return ""
 }
 
 func (c *Client) get(path string, out any) error {

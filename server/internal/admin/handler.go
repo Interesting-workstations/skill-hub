@@ -60,6 +60,12 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	h.protected(mux, "GET /api/v1/admin/config", h.getConfig)
 	h.protected(mux, "PUT /api/v1/admin/config", h.saveConfig)
 
+	// 官方组织（动态管理）
+	h.protected(mux, "GET /api/v1/admin/official-orgs", h.listOfficialOrgs)
+	h.protected(mux, "POST /api/v1/admin/official-orgs", h.createOfficialOrg)
+	h.protected(mux, "PUT /api/v1/admin/official-orgs/{owner}", h.updateOfficialOrg)
+	h.protected(mux, "DELETE /api/v1/admin/official-orgs/{owner}", h.deleteOfficialOrg)
+
 	// 抓取数据
 	h.protected(mux, "GET /api/v1/admin/data", h.listData)
 	h.protected(mux, "PUT /api/v1/admin/data/{id}/status", h.updateDataStatus)
@@ -303,6 +309,54 @@ func (h *Handler) updateTask(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) deleteTask(w http.ResponseWriter, r *http.Request) {
 	if err := h.svc.DeleteTask(r.PathValue("id")); err != nil {
+		response.Fail(w, http.StatusInternalServerError, 50001, "系统错误")
+		return
+	}
+	response.OK(w, map[string]string{"message": "已删除"})
+}
+
+// GET /api/v1/admin/official-orgs —— 官方组织列表。
+func (h *Handler) listOfficialOrgs(w http.ResponseWriter, _ *http.Request) {
+	list, err := h.svc.ListOfficialOrgs()
+	if err != nil {
+		response.Fail(w, http.StatusInternalServerError, 50001, "系统错误")
+		return
+	}
+	response.OK(w, list)
+}
+
+// POST /api/v1/admin/official-orgs —— 新增官方组织。
+func (h *Handler) createOfficialOrg(w http.ResponseWriter, r *http.Request) {
+	var o domain.OfficialOrg
+	if err := json.NewDecoder(r.Body).Decode(&o); err != nil {
+		response.Fail(w, http.StatusBadRequest, 40001, "请求参数错误")
+		return
+	}
+	created, err := h.svc.CreateOfficialOrg(o)
+	if err != nil {
+		response.Fail(w, http.StatusBadRequest, 40001, err.Error())
+		return
+	}
+	response.OK(w, created)
+}
+
+// PUT /api/v1/admin/official-orgs/{owner} —— 更新官方组织。
+func (h *Handler) updateOfficialOrg(w http.ResponseWriter, r *http.Request) {
+	var o domain.OfficialOrg
+	if err := json.NewDecoder(r.Body).Decode(&o); err != nil {
+		response.Fail(w, http.StatusBadRequest, 40001, "请求参数错误")
+		return
+	}
+	if err := h.svc.UpdateOfficialOrg(r.PathValue("owner"), o); err != nil {
+		response.Fail(w, http.StatusInternalServerError, 50001, "系统错误")
+		return
+	}
+	response.OK(w, map[string]string{"message": "已更新"})
+}
+
+// DELETE /api/v1/admin/official-orgs/{owner} —— 删除官方组织。
+func (h *Handler) deleteOfficialOrg(w http.ResponseWriter, r *http.Request) {
+	if err := h.svc.DeleteOfficialOrg(r.PathValue("owner")); err != nil {
 		response.Fail(w, http.StatusInternalServerError, 50001, "系统错误")
 		return
 	}

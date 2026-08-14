@@ -205,3 +205,15 @@ type AdminStats struct {
 	// Trend 近 7 天执行趋势（真实统计）。
 	Trend []TrendPoint `json:"trend"`
 }
+
+// OfficialOrg 官方组织（动态管理）。
+// 爬虫识别官方来源的依据：仓库 owner 在此表内 → 官方技能。
+// 可在后台增删改，无需改代码。
+type OfficialOrg struct {
+	Owner       string `json:"owner"`
+	DisplayName string `json:"displayName"`
+	Avatar      string `json:"avatar"`
+	SortOrder   int    `json:"sortOrder"`
+	Enabled     bool   `json:"enabled"`
+	CreatedAt   string `json:"createdAt"`
+}

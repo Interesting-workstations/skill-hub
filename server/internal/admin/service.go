@@ -504,6 +504,43 @@ func (s *Service) DeleteTask(id string) error {
 	return s.repo.DeleteTask(id)
 }
 
+// ---------- 官方组织（动态管理） ----------
+
+func (s *Service) ListOfficialOrgs() ([]domain.OfficialOrg, error) {
+	return s.repo.ListOfficialOrgs()
+}
+
+func (s *Service) CreateOfficialOrg(input domain.OfficialOrg) (domain.OfficialOrg, error) {
+	input.Owner = strings.TrimSpace(input.Owner)
+	input.DisplayName = strings.TrimSpace(input.DisplayName)
+	if input.Owner == "" || input.DisplayName == "" {
+		return domain.OfficialOrg{}, fmt.Errorf("GitHub 组织名与展示名必填")
+	}
+	input.CreatedAt = today()
+	err := s.repo.CreateOfficialOrg(&input)
+	return input, err
+}
+
+func (s *Service) UpdateOfficialOrg(owner string, patch domain.OfficialOrg) error {
+	fields := map[string]any{}
+	if patch.DisplayName != "" {
+		fields["display_name"] = patch.DisplayName
+	}
+	if patch.Avatar != "" {
+		fields["avatar"] = patch.Avatar
+	}
+	fields["sort_order"] = patch.SortOrder
+	fields["enabled"] = 0
+	if patch.Enabled {
+		fields["enabled"] = 1
+	}
+	return s.repo.UpdateOfficialOrg(owner, fields)
+}
+
+func (s *Service) DeleteOfficialOrg(owner string) error {
+	return s.repo.DeleteOfficialOrg(owner)
+}
+
 // RunTask 启动一次真实爬虫执行（后台 goroutine，前端轮询执行记录）。
 func (s *Service) RunTask(id string) (domain.ExecutionRecord, error) {
 	task, err := s.repo.GetTask(id)
@@ -574,6 +611,20 @@ func (s *Service) executeTask(taskID, taskName, query, execID string) {
 	}
 
 	appendLog("info", "开始抓取目标数据")
+	// 动态加载官方组织（official_orgs 表）并注入爬虫客户端，识别官方来源无需改代码
+	if orgs, err := s.repo.ListOfficialOrgs(); err == nil && len(orgs) > 0 {
+		clientOrgs := make([]crawler.OfficialOrg, 0, len(orgs))
+		for _, o := range orgs {
+			if !o.Enabled {
+				continue
+			}
+			clientOrgs = append(clientOrgs, crawler.OfficialOrg{
+				Owner: o.Owner, DisplayName: o.DisplayName, Avatar: o.Avatar,
+			})
+		}
+		s.client.SetOfficialOrgs(clientOrgs)
+		appendLog("info", fmt.Sprintf("已加载官方组织 %d 个（动态配置）", len(clientOrgs)))
+	}
 	progress(5, "读取爬虫配置")
 	cfg, err := s.repo.GetConfig()
 	if err != nil {
