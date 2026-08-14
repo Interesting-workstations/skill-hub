@@ -24,6 +24,7 @@ export default function OfficialOrgsPage() {
   // GitHub 校验结果（owner → 校验信息）
   const [verifyMap, setVerifyMap] = useState<Record<string, OrgVerifyResult>>({});
   const [verifying, setVerifying] = useState(false);
+  const [page, setPage] = useState(1);
 
   const load = async () => {
     setLoading(true);
@@ -197,7 +198,9 @@ export default function OfficialOrgsPage() {
         data={orgs}
         rowKey={(o) => o.owner}
         loading={loading}
+        page={page}
         pageSize={15}
+        onPageChange={setPage}
       />
 
       <AppDialog

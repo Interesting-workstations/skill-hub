@@ -18,6 +18,7 @@ export default function SponsorsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<Sponsor | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Sponsor | null>(null);
+  const [page, setPage] = useState(1);
 
   const [name, setName] = useState("");
   const [logo, setLogo] = useState("");
@@ -159,7 +160,9 @@ export default function SponsorsPage() {
         data={sponsors}
         rowKey={(s) => s.id}
         loading={loading}
+        page={page}
         pageSize={10}
+        onPageChange={setPage}
       />
 
       <AppDialog

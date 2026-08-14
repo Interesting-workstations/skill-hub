@@ -15,6 +15,7 @@ export default function TaskListPage() {
   const [keyword, setKeyword] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
+  const [page, setPage] = useState(1);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<CrawlTask | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<CrawlTask | null>(null);
@@ -157,7 +158,9 @@ export default function TaskListPage() {
         data={filtered}
         rowKey={(t) => t.id}
         loading={loading}
+        page={page}
         pageSize={10}
+        onPageChange={setPage}
         toolbar={
           <>
             <div className="filters">

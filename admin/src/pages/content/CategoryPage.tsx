@@ -8,6 +8,7 @@ import { formatNumber } from "../../utils/format";
 export default function CategoryPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     siteApi.categories()
@@ -68,7 +69,9 @@ export default function CategoryPage() {
         data={categories}
         rowKey={(c) => c.slug}
         loading={loading}
+        page={page}
         pageSize={10}
+        onPageChange={setPage}
       />
     </div>
   );

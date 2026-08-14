@@ -12,6 +12,7 @@ export default function ArticlePage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<Article | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Article | null>(null);
+  const [page, setPage] = useState(1);
 
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("教程");
@@ -129,7 +130,9 @@ export default function ArticlePage() {
         data={articles}
         rowKey={(a) => a.id}
         loading={loading}
+        page={page}
         pageSize={10}
+        onPageChange={setPage}
       />
 
       <AppDialog

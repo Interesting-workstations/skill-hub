@@ -6,6 +6,7 @@ import type { FailureRecord } from "../../types";
 export default function FailurePage() {
   const [failures, setFailures] = useState<FailureRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
 
   const load = async () => {
     setLoading(true);
@@ -85,7 +86,9 @@ export default function FailurePage() {
         data={failures}
         rowKey={(f) => f.id}
         loading={loading}
+        page={page}
         pageSize={10}
+        onPageChange={setPage}
       />
     </div>
   );

@@ -8,6 +8,7 @@ import type { ExecutionRecord } from "../../types";
 export default function ExecutionListPage() {
   const [records, setRecords] = useState<ExecutionRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     crawlerApi.listExecutions().then((r) => {
@@ -92,7 +93,9 @@ export default function ExecutionListPage() {
         data={records}
         rowKey={(e) => e.id}
         loading={loading}
+        page={page}
         pageSize={10}
+        onPageChange={setPage}
       />
     </div>
   );
