@@ -800,7 +800,7 @@ func (r *mysqlRepo) DeleteData(id string) error {
 }
 
 // AutoAuditPending 机器人自动审核：对待审核技能按规则判定，
-// 内容完整规范且无重复的直接通过（approved），有问题的（内容不足/描述缺失/重复/名称异常）留给人工。
+// 内容完整规范且无重复的直接通过并发布（published），有问题的（内容不足/描述缺失/重复/名称异常）留给人工。
 func (r *mysqlRepo) AutoAuditPending() (AutoAuditResult, error) {
 	// 已通过/已发布集合（重复检测：同 author+name 已存在 → 转人工）
 	existing := map[string]bool{}
@@ -823,7 +823,7 @@ func (r *mysqlRepo) AutoAuditPending() (AutoAuditResult, error) {
 	defer rows.Close()
 
 	var res AutoAuditResult
-	var approvedIDs []string
+	var publishIDs []string
 	for rows.Next() {
 		var id, name, author, desc, content string
 		if err := rows.Scan(&id, &name, &author, &desc, &content); err != nil {
@@ -831,18 +831,19 @@ func (r *mysqlRepo) AutoAuditPending() (AutoAuditResult, error) {
 		}
 		res.Total++
 		if skillAutoPass(name, desc, content) && !existing[strings.ToLower(author+"\x00"+name)] {
-			approvedIDs = append(approvedIDs, id)
+			publishIDs = append(publishIDs, id)
 		}
 	}
 	if err := rows.Err(); err != nil {
 		return res, err
 	}
-	if len(approvedIDs) > 0 {
-		if err := r.UpdateDataStatusBatch(approvedIDs, "approved"); err != nil {
+	// 通过即发布（published），直接上线官网
+	if len(publishIDs) > 0 {
+		if err := r.UpdateDataStatusBatch(publishIDs, "published"); err != nil {
 			return res, err
 		}
 	}
-	res.Approved = len(approvedIDs)
+	res.Approved = len(publishIDs)
 	res.Manual = res.Total - res.Approved
 	return res, nil
 }

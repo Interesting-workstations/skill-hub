@@ -91,15 +91,15 @@ export default function AuditPage() {
     }
   };
 
-  // 机器人自动审核：内容完整规范的直接通过，有问题的留给人工
+  // 机器人自动审核：内容完整规范的直接通过并发布，有问题的留给人工
   const runAutoAudit = async () => {
     setAutoAuditing(true);
     try {
       const res = await contentApi.autoAuditData();
       if (res.manual > 0) {
-        toast.success(`🤖 机器人审核完成：${res.approved} 条直接通过，${res.manual} 条转人工`);
+        toast.success(`🤖 机器人审核完成：${res.approved} 条已自动发布，${res.manual} 条转人工`);
       } else {
-        toast.success(`🤖 机器人审核完成：全部 ${res.approved} 条通过`);
+        toast.success(`🤖 机器人审核完成：全部 ${res.approved} 条已自动发布`);
       }
       void load(filter);
     } catch {
@@ -191,7 +191,7 @@ export default function AuditPage() {
           className="btn btn-primary"
           onClick={runAutoAudit}
           disabled={autoAuditing}
-          title="内容完整规范且无重复的直接通过，有问题的交给人工审核"
+          title="内容完整规范且无重复的直接通过并发布上线，有问题的交给人工审核"
         >
           {autoAuditing ? "🤖 审核中…" : "🤖 机器人审核"}
         </button>

@@ -72,7 +72,7 @@ export const contentApi = {
   batchUpdateDataStatus(ids: string[], status: DataStatus): Promise<void> {
     return http.post<void>(`${base}/data/batch-status`, { ids, status });
   },
-  /** 机器人自动审核：内容完整规范且无重复的直接通过，有问题的留人工 */
+  /** 机器人自动审核：内容完整规范且无重复的直接通过并发布，有问题的留人工 */
   autoAuditData(): Promise<{ total: number; approved: number; manual: number }> {
     return http.post<{ total: number; approved: number; manual: number }>(`${base}/data/auto-audit`);
   },
