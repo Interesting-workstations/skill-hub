@@ -255,6 +255,19 @@ func (c *Client) GetRepo(fullName string) (Repo, error) {
 	return repo, nil
 }
 
+// ListOrgRepos 获取 GitHub 组织的公开仓库（按 star 降序，取前 perPage 个）。
+// 用于爬虫执行时自动发现官方组织的技能仓库，使官方技能与官方组织挂钩。
+func (c *Client) ListOrgRepos(org string, perPage int) ([]Repo, error) {
+	if perPage <= 0 {
+		perPage = 5
+	}
+	var out []Repo
+	if err := c.get(fmt.Sprintf("/orgs/%s/repos?per_page=%d&sort=stars&type=public", url.PathEscape(org), perPage), &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ListContents 列出仓库某路径下的内容。
 func (c *Client) ListContents(fullName, path, ref string) ([]ContentEntry, error) {
 	p := "/repos/" + fullName + "/contents/" + path

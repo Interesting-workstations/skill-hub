@@ -659,12 +659,14 @@ func (s *Service) executeTask(taskID, taskName, query, execID string) {
 
 	appendLog("info", "开始抓取目标数据")
 	// 动态加载官方组织（official_orgs 表）并注入爬虫客户端，识别官方来源无需改代码
+	var orgOwners []string
 	if orgs, err := s.repo.ListOfficialOrgs(); err == nil && len(orgs) > 0 {
 		clientOrgs := make([]crawler.OfficialOrg, 0, len(orgs))
 		for _, o := range orgs {
 			if !o.Enabled {
 				continue
 			}
+			orgOwners = append(orgOwners, o.Owner)
 			clientOrgs = append(clientOrgs, crawler.OfficialOrg{
 				Owner: o.Owner, DisplayName: o.DisplayName, Avatar: o.Avatar,
 			})
@@ -690,6 +692,14 @@ func (s *Service) executeTask(taskID, taskName, query, execID string) {
 	}
 
 	repos := splitRepos(cfg.OfficialRepos)
+	// 自动发现官方组织的技能仓库，与官方组织挂钩（名称含 skill/agent/mcp 优先，否则取高星仓库）
+	if len(orgOwners) > 0 {
+		discovered := discoverOfficialRepos(s.client, orgOwners)
+		if len(discovered) > 0 {
+			repos = append(repos, discovered...)
+			appendLog("info", fmt.Sprintf("自动发现官方组织技能仓库 %d 个（与官方组织挂钩）", len(discovered)))
+		}
+	}
 	opts := crawler.CrawlOptions{
 		Query:   query,
 		Repos:   repos,
@@ -1075,6 +1085,51 @@ func splitRepos(s string) []string {
 			out = append(out, p)
 		}
 	}
+	return out
+}
+
+// discoverOfficialRepos 为每个官方组织查找其技能仓库（并发，限流），返回 fullName 列表。
+// 只选名称含 skill/agent/mcp 的仓库（取 star 最高者），无技能仓库的组织跳过；
+// 总上限 15 个，去重。使爬虫能主动抓取官方组织的技能仓库，爬出的技能自动标记为官方（与官方组织挂钩）。
+func discoverOfficialRepos(client *crawler.Client, owners []string) []string {
+	seen := map[string]bool{}
+	var out []string
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, 5)
+	for _, owner := range owners {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(o string) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			repos, err := client.ListOrgRepos(o, 10)
+			if err != nil || len(repos) == 0 {
+				return
+			}
+			picked := ""
+			bestStars := -1
+			for _, r := range repos {
+				n := strings.ToLower(r.FullName)
+				if strings.Contains(n, "skill") || strings.Contains(n, "agent") || strings.Contains(n, "mcp") {
+					if r.Stars > bestStars {
+						picked = r.FullName
+						bestStars = r.Stars
+					}
+				}
+			}
+			if picked == "" {
+				return // 该组织没有明显的技能仓库，跳过
+			}
+			mu.Lock()
+			if !seen[picked] && len(out) < 20 {
+				seen[picked] = true
+				out = append(out, picked)
+			}
+			mu.Unlock()
+		}(owner)
+	}
+	wg.Wait()
 	return out
 }
 
