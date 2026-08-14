@@ -268,6 +268,24 @@ func (c *Client) ListOrgRepos(org string, perPage int) ([]Repo, error) {
 	return out, nil
 }
 
+// HasSkillStructure 判断仓库是否具备 skill 结构（根目录有 SKILL.md，或有 skills/skillsets 目录）。
+// 用于官方仓库发现：只保留真正能产出技能的结构，避免爬取 agent/mcp 代码仓库浪费资源。
+func (c *Client) HasSkillStructure(fullName string) bool {
+	entries, err := c.ListContents(fullName, "", "")
+	if err != nil {
+		return false
+	}
+	for _, e := range entries {
+		if e.Type == "file" && strings.EqualFold(e.Name, "SKILL.md") {
+			return true
+		}
+		if e.Type == "dir" && (strings.EqualFold(e.Name, "skills") || strings.EqualFold(e.Name, "skillsets")) {
+			return true
+		}
+	}
+	return false
+}
+
 // ListContents 列出仓库某路径下的内容。
 func (c *Client) ListContents(fullName, path, ref string) ([]ContentEntry, error) {
 	p := "/repos/" + fullName + "/contents/" + path

@@ -1094,11 +1094,12 @@ func splitRepos(s string) []string {
 }
 
 // discoverOfficialRepos 为每个官方组织查找其技能仓库（并发，限流），返回 fullName 列表。
-// 只选名称含 skill/agent/mcp 的仓库（取 star 最高者），无技能仓库的组织跳过；
-// 总上限 15 个，去重。使爬虫能主动抓取官方组织的技能仓库，爬出的技能自动标记为官方（与官方组织挂钩）。
+// 两轮筛选：①按 star 排行取名称含 skill/agent/mcp 的候选仓库；②只保留具备 skill 结构
+// （根 SKILL.md 或 skills/skillsets 目录）的仓库，避免爬 agent/mcp 代码仓库浪费资源。
+// 总上限 15 个，去重。使爬虫能主动抓取官方组织的技能仓库，爬出的技能自动标记为官方。
 func discoverOfficialRepos(client *crawler.Client, owners []string) []string {
-	seen := map[string]bool{}
-	var out []string
+	// 第一轮：候选仓库（每个官方组织 star 最高的技能类仓库）
+	var candidates []string
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, 5)
@@ -1123,18 +1124,37 @@ func discoverOfficialRepos(client *crawler.Client, owners []string) []string {
 					}
 				}
 			}
-			if picked == "" {
-				return // 该组织没有明显的技能仓库，跳过
+			if picked != "" {
+				mu.Lock()
+				candidates = append(candidates, picked)
+				mu.Unlock()
 			}
-			mu.Lock()
-			if !seen[picked] && len(out) < 20 {
-				seen[picked] = true
-				out = append(out, picked)
-			}
-			mu.Unlock()
 		}(owner)
 	}
 	wg.Wait()
+
+	// 第二轮：只保留具备 skill 结构的仓库（能真正产出技能）
+	var out []string
+	var mu2 sync.Mutex
+	var wg2 sync.WaitGroup
+	sem2 := make(chan struct{}, 5)
+	for _, fullName := range candidates {
+		wg2.Add(1)
+		sem2 <- struct{}{}
+		go func(fn string) {
+			defer wg2.Done()
+			defer func() { <-sem2 }()
+			if !client.HasSkillStructure(fn) {
+				return
+			}
+			mu2.Lock()
+			if len(out) < 15 {
+				out = append(out, fn)
+			}
+			mu2.Unlock()
+		}(fullName)
+	}
+	wg2.Wait()
 	return out
 }
 
