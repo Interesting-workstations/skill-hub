@@ -906,8 +906,8 @@ func (s *Service) SaveConfig(c domain.CrawlerConfig) error {
 
 // ---------- 抓取数据（数据审核） ----------
 
-func (s *Service) ListData(status string) ([]DataItem, error) {
-	return s.repo.ListData(status)
+func (s *Service) ListData(f DataFilter) ([]DataItem, error) {
+	return s.repo.ListData(f)
 }
 
 func (s *Service) UpdateDataStatus(id, status string) error {
@@ -915,6 +915,17 @@ func (s *Service) UpdateDataStatus(id, status string) error {
 		return fmt.Errorf("无效的数据状态")
 	}
 	return s.repo.UpdateDataStatus(id, status)
+}
+
+// UpdateDataStatusBatch 批量更新数据状态（审核页全选后一键通过/忽略）。
+func (s *Service) UpdateDataStatusBatch(ids []string, status string) error {
+	if len(ids) == 0 {
+		return fmt.Errorf("未选择任何数据")
+	}
+	if !isValidDataStatus(status) {
+		return fmt.Errorf("无效的数据状态")
+	}
+	return s.repo.UpdateDataStatusBatch(ids, status)
 }
 
 func (s *Service) DeleteData(id string) error {

@@ -204,6 +204,10 @@ type AdminStats struct {
 	TotalCats    int `json:"totalCategories"`
 	// Trend 近 7 天执行趋势（真实统计）。
 	Trend []TrendPoint `json:"trend"`
+	// StatusDist 数据状态分布（pending/approved/published/ignored）。
+	StatusDist map[string]int `json:"statusDist"`
+	// TypeDist 数据来源分布（official/community）。
+	TypeDist map[string]int `json:"typeDist"`
 }
 
 // OfficialOrg 官方组织（动态管理）。

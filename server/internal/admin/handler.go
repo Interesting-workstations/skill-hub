@@ -69,6 +69,12 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	h.protected(mux, "GET /api/v1/admin/official-orgs/verify", h.verifyOfficialOrgs)
 	h.protected(mux, "GET /api/v1/admin/export", h.exportData)
 
+	// 抓取数据（数据审核）
+	h.protected(mux, "GET /api/v1/admin/data", h.listData)
+	h.protected(mux, "PUT /api/v1/admin/data/{id}/status", h.updateDataStatus)
+	h.protected(mux, "POST /api/v1/admin/data/batch-status", h.batchUpdateDataStatus)
+	h.protected(mux, "DELETE /api/v1/admin/data/{id}", h.deleteData)
+
 	// 文章
 	h.protected(mux, "GET /api/v1/admin/articles", h.listArticles)
 	h.protected(mux, "POST /api/v1/admin/articles", h.createArticle)
@@ -555,12 +561,38 @@ func (h *Handler) saveConfig(w http.ResponseWriter, r *http.Request) {
 // ---------- 抓取数据 ----------
 
 func (h *Handler) listData(w http.ResponseWriter, r *http.Request) {
-	items, err := h.svc.ListData(r.URL.Query().Get("status"))
+	q := r.URL.Query()
+	f := DataFilter{
+		Status:   q.Get("status"),
+		Source:   q.Get("source"),
+		Category: q.Get("category"),
+		Author:   q.Get("author"),
+		Query:    q.Get("q"),
+		Sort:     q.Get("sort"),
+	}
+	items, err := h.svc.ListData(f)
 	if err != nil {
 		response.Fail(w, http.StatusInternalServerError, 50001, "系统错误")
 		return
 	}
 	response.OK(w, items)
+}
+
+// POST /api/v1/admin/data/batch-status —— 批量更新数据状态（审核页全选操作）。
+func (h *Handler) batchUpdateDataStatus(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		IDs    []string `json:"ids"`
+		Status string   `json:"status"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		response.Fail(w, http.StatusBadRequest, 40001, "请求参数错误")
+		return
+	}
+	if err := h.svc.UpdateDataStatusBatch(body.IDs, body.Status); err != nil {
+		response.Fail(w, http.StatusBadRequest, 40002, err.Error())
+		return
+	}
+	response.OK(w, map[string]int{"updated": len(body.IDs)})
 }
 
 func (h *Handler) updateDataStatus(w http.ResponseWriter, r *http.Request) {

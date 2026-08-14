@@ -91,6 +91,64 @@ export default function DashboardPage() {
         )}
       </div>
 
+      {/* 数据看板：状态分布 + 来源分布 */}
+      <div className="card card-pad">
+        <div className="card-title">数据看板</div>
+        <div className="dash-grid-2">
+          <div>
+            <div style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: 10 }}>数据状态分布</div>
+            {(
+              [
+                { key: "pending", label: "待审核", color: "#f59e0b" },
+                { key: "approved", label: "已批准", color: "#3b82f6" },
+                { key: "published", label: "已发布", color: "#22c55e" },
+                { key: "ignored", label: "已忽略", color: "#9ca3af" },
+              ] as const
+            ).map((m) => {
+              const n = stats?.statusDist?.[m.key] ?? 0;
+              const pct = stats && stats.totalSkills > 0 ? Math.round((n / stats.totalSkills) * 100) : 0;
+              return (
+                <div key={m.key} style={{ marginBottom: 10 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+                    <span style={{ color: "var(--color-text-secondary)" }}>{m.label}</span>
+                    <span style={{ fontWeight: 600 }}>{n}（{pct}%）</span>
+                  </div>
+                  <div style={{ height: 8, borderRadius: 4, background: "var(--color-surface-hover)", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${pct}%`, background: m.color, borderRadius: 4 }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div>
+            <div style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: 10 }}>数据来源分布</div>
+            {(
+              [
+                { key: "official", label: "官方来源", color: "#8b5cf6" },
+                { key: "community", label: "社区个人", color: "#64748b" },
+              ] as const
+            ).map((m) => {
+              const n = stats?.typeDist?.[m.key] ?? 0;
+              const pct = stats && stats.totalSkills > 0 ? Math.round((n / stats.totalSkills) * 100) : 0;
+              return (
+                <div key={m.key} style={{ marginBottom: 10 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+                    <span style={{ color: "var(--color-text-secondary)" }}>{m.label}</span>
+                    <span style={{ fontWeight: 600 }}>{n}（{pct}%）</span>
+                  </div>
+                  <div style={{ height: 8, borderRadius: 4, background: "var(--color-surface-hover)", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${pct}%`, background: m.color, borderRadius: 4 }} />
+                  </div>
+                </div>
+              );
+            })}
+            <div style={{ marginTop: 14, fontSize: 12, color: "var(--color-text-tertiary)" }}>
+              官方来源技能自动发布，社区来源需人工审核
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* 最近执行 + 最近失败 */}
       <div className="dash-grid-2">
         <div className="card card-pad">

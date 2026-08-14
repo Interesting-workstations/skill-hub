@@ -19,6 +19,18 @@ export interface ExportResult {
 
 const base = "/api/v1/admin";
 
+/** 抓取数据筛选条件（审核页） */
+export interface DataFilter {
+  status?: DataStatus | "";
+  /** official=官方来源 / community=社区个人 */
+  source?: "official" | "community" | "";
+  category?: string;
+  author?: string;
+  q?: string;
+  /** stars=高星优先 / name / newest */
+  sort?: "stars" | "name" | "newest";
+}
+
 export const contentApi = {
   /* ---- 文章 ---- */
   listArticles(): Promise<Article[]> {
@@ -42,11 +54,23 @@ export const contentApi = {
   },
 
   /* ---- 抓取数据 ---- */
-  listData(status?: DataStatus): Promise<CrawledDataItem[]> {
-    return http.get<CrawledDataItem[]>(`${base}/data${status ? `?status=${status}` : ""}`);
+  listData(filter: DataFilter = {}): Promise<CrawledDataItem[]> {
+    const qs = new URLSearchParams();
+    if (filter.status) qs.set("status", filter.status);
+    if (filter.source) qs.set("source", filter.source);
+    if (filter.category) qs.set("category", filter.category);
+    if (filter.author) qs.set("author", filter.author);
+    if (filter.q) qs.set("q", filter.q);
+    if (filter.sort) qs.set("sort", filter.sort);
+    const str = qs.toString();
+    return http.get<CrawledDataItem[]>(`${base}/data${str ? `?${str}` : ""}`);
   },
   updateDataStatus(id: string, status: DataStatus): Promise<void> {
     return http.put<void>(`${base}/data/${encodeURIComponent(id)}/status`, { status });
+  },
+  /** 批量更新状态（全选后一键通过/忽略/删除） */
+  batchUpdateDataStatus(ids: string[], status: DataStatus): Promise<void> {
+    return http.post<void>(`${base}/data/batch-status`, { ids, status });
   },
   deleteData(id: string): Promise<void> {
     return http.delete<void>(`${base}/data/${encodeURIComponent(id)}`);

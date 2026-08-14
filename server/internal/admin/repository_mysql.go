@@ -30,6 +30,17 @@ type DataItem struct {
 	Status      string `json:"status"`
 }
 
+// DataFilter 抓取数据列表的筛选条件（审核页）。
+// Source：official=官方来源 / community=社区个人；Sort：stars=高星优先 / name / newest。
+type DataFilter struct {
+	Status   string
+	Source   string
+	Category string
+	Author   string
+	Query    string
+	Sort     string
+}
+
 // Repository 定义后台管理数据访问接口。
 type Repository interface {
 	ListTasks() ([]domain.CrawlTask, error)
@@ -50,8 +61,9 @@ type Repository interface {
 	GetConfig() (domain.CrawlerConfig, error)
 	SaveConfig(c domain.CrawlerConfig) error
 
-	ListData(status string) ([]DataItem, error)
+	ListData(f DataFilter) ([]DataItem, error)
 	UpdateDataStatus(id, status string) error
+	UpdateDataStatusBatch(ids []string, status string) error
 	DeleteData(id string) error
 
 	ListArticles() ([]domain.Article, error)
@@ -693,15 +705,49 @@ func (r *mysqlRepo) SaveConfig(c domain.CrawlerConfig) error {
 
 // ---------- 抓取数据（数据审核） ----------
 
-func (r *mysqlRepo) ListData(status string) ([]DataItem, error) {
+func (r *mysqlRepo) ListData(f DataFilter) ([]DataItem, error) {
 	query := `SELECT id, name, author, category, github_stars, is_official, github_url, data_status
 		FROM skills`
+	var conds []string
 	var args []any
-	if status != "" {
-		query += ` WHERE data_status = ?`
-		args = append(args, status)
+	if f.Status != "" {
+		conds = append(conds, "data_status = ?")
+		args = append(args, f.Status)
 	}
-	query += ` ORDER BY id DESC LIMIT 200`
+	if f.Source == "official" {
+		conds = append(conds, "is_official = 1")
+	} else if f.Source == "community" {
+		conds = append(conds, "is_official = 0")
+	}
+	if f.Category != "" {
+		conds = append(conds, "category = ?")
+		args = append(args, f.Category)
+	}
+	if f.Author != "" {
+		conds = append(conds, "author = ?")
+		args = append(args, f.Author)
+	}
+	if f.Query != "" {
+		conds = append(conds, "(name LIKE ? OR description LIKE ? OR author LIKE ?)")
+		kw := "%" + f.Query + "%"
+		args = append(args, kw, kw, kw)
+	}
+	if len(conds) > 0 {
+		query += " WHERE " + strings.Join(conds, " AND ")
+	}
+	// 高星优先：github_stars 为文本列（可能带 k/m 后缀，如 271.9k），解析为数值排序
+	switch f.Sort {
+	case "stars":
+		query += ` ORDER BY CASE
+			WHEN github_stars LIKE '%k' OR github_stars LIKE '%K' THEN CAST(REPLACE(LOWER(github_stars), 'k', '') AS DECIMAL(10,2)) * 1000
+			WHEN github_stars LIKE '%m' OR github_stars LIKE '%M' THEN CAST(REPLACE(LOWER(github_stars), 'm', '') AS DECIMAL(10,2)) * 1000000
+			ELSE CAST(NULLIF(github_stars, '') AS DECIMAL(10,2))
+		END DESC, id DESC`
+	case "name":
+		query += ` ORDER BY name ASC, id DESC`
+	default:
+		query += ` ORDER BY id DESC`
+	}
 	rows, err := r.db.Query(query, args...)
 	if err != nil {
 		return nil, err
@@ -723,6 +769,20 @@ func (r *mysqlRepo) ListData(status string) ([]DataItem, error) {
 
 func (r *mysqlRepo) UpdateDataStatus(id, status string) error {
 	_, err := r.db.Exec(`UPDATE skills SET data_status = ? WHERE id = ?`, status, id)
+	return err
+}
+
+func (r *mysqlRepo) UpdateDataStatusBatch(ids []string, status string) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(ids)), ",")
+	args := make([]any, 0, len(ids)+1)
+	args = append(args, status)
+	for _, id := range ids {
+		args = append(args, id)
+	}
+	_, err := r.db.Exec(`UPDATE skills SET data_status = ? WHERE id IN (`+placeholders+`)`, args...)
 	return err
 }
 
@@ -1053,12 +1113,17 @@ func (r *mysqlRepo) InsertCrawledSkills(skills []InsertSkill) error {
 		if s.IsOfficial {
 			official = 1
 		}
+		// 官方来源自动通过（直接发布），社区来源进入待审核（人工审核）
+		dataStatus := "pending"
+		if s.IsOfficial {
+			dataStatus = "published"
+		}
 		if _, err := tx.Exec(
 			`INSERT INTO skills(id, name, author, description, category, download_url,
 				is_official, is_featured, install_command, github_url, github_stars, license, skill_path, tags, content, data_status)
 			 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 			s.ID, s.Name, s.Author, s.Description, s.Category, s.DownloadURL,
-			official, 0, "", s.GithubURL, s.GithubStars, s.License, s.SkillPath, string(tags), string(content), "pending",
+			official, 0, "", s.GithubURL, s.GithubStars, s.License, s.SkillPath, string(tags), string(content), dataStatus,
 		); err != nil {
 			return err
 		}
@@ -1096,6 +1161,24 @@ func (r *mysqlRepo) Stats() (domain.AdminStats, error) {
 	_ = r.db.QueryRow(`SELECT COUNT(*) FROM categories`).Scan(&st.TotalCats)
 	// 今日成功 / 新增数据（简化：执行记录中成功数）
 	_ = r.db.QueryRow(`SELECT COUNT(*) FROM crawl_executions WHERE status = 'success'`).Scan(&st.RunSuccess)
+	// 数据状态分布（审核看板）
+	st.StatusDist = map[string]int{}
+	if rows, err := r.db.Query(`SELECT data_status, COUNT(*) FROM skills GROUP BY data_status`); err == nil {
+		for rows.Next() {
+			var k string
+			var n int
+			if rows.Scan(&k, &n) == nil {
+				st.StatusDist[k] = n
+			}
+		}
+		rows.Close()
+	}
+	// 来源分布（官方 / 社区）
+	st.TypeDist = map[string]int{"official": 0, "community": 0}
+	var offN int
+	_ = r.db.QueryRow(`SELECT COUNT(*) FROM skills WHERE is_official = 1`).Scan(&offN)
+	st.TypeDist["official"] = offN
+	st.TypeDist["community"] = st.TotalSkills - offN
 	st.Trend = r.execTrend(7)
 	return st, nil
 }

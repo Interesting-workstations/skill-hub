@@ -55,6 +55,10 @@ export interface AdminStats {
   totalCategories: number;
   /** 近 7 天执行趋势 */
   trend?: TrendPoint[];
+  /** 数据状态分布（pending/approved/published/ignored） */
+  statusDist?: Record<string, number>;
+  /** 数据来源分布（official/community） */
+  typeDist?: Record<string, number>;
 }
 
 export interface TrendPoint {
