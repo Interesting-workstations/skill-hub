@@ -38,8 +38,10 @@ function fallbackSponsors(t: I18nValue["t"]): Sponsor[] {
 
 export default function SponsorBanner() {
   const { t, lang } = useI18n();
-  // null = 加载中/未请求；[] = 接口无数据（走回退）
+  // sponsors: null=加载中；[]=接口正常返回空（后台未配置/全部停用 → 不展示）
+  // failed: 接口请求失败时才回退到硬编码赞助商
   const [sponsors, setSponsors] = useState<Sponsor[] | null>(null);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -48,18 +50,23 @@ export default function SponsorBanner() {
         if (alive) setSponsors(list);
       })
       .catch(() => {
-        if (alive) setSponsors([]);
+        if (alive) setFailed(true);
       });
     return () => {
       alive = false;
     };
   }, []);
 
-  const list = sponsors && sponsors.length > 0 ? sponsors : fallbackSponsors(t);
+  // 只有请求失败才回退；后台停用/未配置时接口返回空数组，首页不显示赞助
+  const list = failed ? fallbackSponsors(t) : sponsors ?? [];
   const description = (s: Sponsor) => {
     if (lang === "zh") return s.descriptionZh || s.descriptionEn;
     return s.descriptionEn || s.descriptionZh;
   };
+
+  if (list.length === 0) {
+    return null;
+  }
 
   return (
     <div className="sponsor-banner">
