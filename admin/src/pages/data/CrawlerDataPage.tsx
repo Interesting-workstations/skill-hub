@@ -57,6 +57,18 @@ export default function CrawlerDataPage() {
     }
   };
 
+  // 一键发布全部已审核数据（清理历史积压）
+  const publishAll = async () => {
+    if (!window.confirm("确认将全部「已审核」数据发布到官网？")) return;
+    try {
+      const res = await contentApi.publishAllApproved();
+      toast.success(`已一键发布 ${res.published} 条已审核数据`);
+      void load();
+    } catch {
+      // 错误已由全局 Toast 提示
+    }
+  };
+
   const columns: Column<CrawledDataItem>[] = [
     {
       key: "name",
@@ -160,6 +172,9 @@ export default function CrawlerDataPage() {
               <option value="published">已发布</option>
               <option value="ignored">已忽略</option>
             </select>
+            <button className="btn btn-sm btn-primary" onClick={publishAll} title="一键发布全部已审核（approved）数据到官网">
+              🚀 一键发布已审核
+            </button>
             {selected.length > 0 && (
               <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                 <span style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>已选 {selected.length} 条</span>

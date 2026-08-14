@@ -943,6 +943,11 @@ func (s *Service) AutoAuditPending() (AutoAuditResult, error) {
 	return s.repo.AutoAuditPending()
 }
 
+// PublishAllApproved 一键发布全部已审核（approved）数据到官网。
+func (s *Service) PublishAllApproved() (int64, error) {
+	return s.repo.PublishAllApproved()
+}
+
 func (s *Service) DeleteData(id string) error {
 	return s.repo.DeleteData(id)
 }

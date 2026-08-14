@@ -76,6 +76,10 @@ export const contentApi = {
   autoAuditData(): Promise<{ total: number; approved: number; manual: number }> {
     return http.post<{ total: number; approved: number; manual: number }>(`${base}/data/auto-audit`);
   },
+  /** 一键发布全部已审核（approved）数据到官网 */
+  publishAllApproved(): Promise<{ published: number }> {
+    return http.post<{ published: number }>(`${base}/data/publish-all-approved`);
+  },
   deleteData(id: string): Promise<void> {
     return http.delete<void>(`${base}/data/${encodeURIComponent(id)}`);
   },

@@ -73,6 +73,7 @@ type Repository interface {
 	UpdateDataStatusBatch(ids []string, status string) error
 	DeleteData(id string) error
 	AutoAuditPending() (AutoAuditResult, error)
+	PublishAllApproved() (int64, error)
 
 	ListArticles() ([]domain.Article, error)
 	GetArticle(id string) (domain.Article, error)
@@ -792,6 +793,16 @@ func (r *mysqlRepo) UpdateDataStatusBatch(ids []string, status string) error {
 	}
 	_, err := r.db.Exec(`UPDATE skills SET data_status = ? WHERE id IN (`+placeholders+`)`, args...)
 	return err
+}
+
+// PublishAllApproved 一键发布全部已审核（approved）的数据到官网（published）。
+// 用于清理历史积压：机器人审核旧逻辑产生的 approved 数据一键上线。
+func (r *mysqlRepo) PublishAllApproved() (int64, error) {
+	res, err := r.db.Exec(`UPDATE skills SET data_status = 'published' WHERE data_status = 'approved'`)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
 }
 
 func (r *mysqlRepo) DeleteData(id string) error {
