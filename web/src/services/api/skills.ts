@@ -1,6 +1,6 @@
 // 技能资源库 API 模块：封装后端接口，组件只依赖这些函数。
 import { request, API_BASE_URL } from "./client";
-import type { Article, Author, AuthorDetail, Category, SeoConfig, SiteConfig, Skill, Sponsor, Stats } from "../../data/types";
+import type { Article, Author, AuthorDetail, Category, OfficialOrgSummary, SeoConfig, SiteConfig, Skill, Sponsor, Stats } from "../../data/types";
 
 export interface SkillQuery {
   category?: string;
@@ -36,6 +36,11 @@ export function skillDownloadUrl(id: string): string {
 /** GET /api/v1/authors */
 export function fetchAuthors(): Promise<Author[]> {
   return request<Author[]>("/authors");
+}
+
+/** GET /api/v1/official-orgs —— 官方组织概览（含各组织官方技能数，官网官方区块数据源） */
+export function fetchOfficialOrgs(): Promise<OfficialOrgSummary[]> {
+  return request<OfficialOrgSummary[]>("/official-orgs");
 }
 
 /** GET /api/v1/authors/:slug */

@@ -3,6 +3,7 @@ import type {
   Author,
   AuthorDetail,
   Category,
+  OfficialOrgSummary,
   Skill,
   Stats,
 } from "../data/types";
@@ -11,6 +12,7 @@ import {
   fetchAuthors,
   fetchCategories,
   fetchCategory,
+  fetchOfficialOrgs,
   fetchSkill,
   fetchSkills,
   fetchStats,
@@ -45,6 +47,11 @@ export function useSkill(id: string | undefined): AsyncState<Skill> {
 /** 全部作者 */
 export function useAuthors(): AsyncState<Author[]> {
   return useAsyncData(fetchAuthors, []);
+}
+
+/** 官方组织概览（官方技能 / 官方组织统一数据源） */
+export function useOfficialOrgs(): AsyncState<OfficialOrgSummary[]> {
+  return useAsyncData(fetchOfficialOrgs, []);
 }
 
 /** 作者详情（含技能）；slug 未就绪时不请求 */

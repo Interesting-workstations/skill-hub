@@ -217,3 +217,12 @@ type OfficialOrg struct {
 	Enabled     bool   `json:"enabled"`
 	CreatedAt   string `json:"createdAt"`
 }
+
+// OfficialOrgSummary 官网首页「官方技能/官方组织」区块的统一数据源：
+// 官方组织及其官方技能数（按展示名去重）。
+type OfficialOrgSummary struct {
+	Owner         string `json:"owner"`
+	DisplayName   string `json:"displayName"`
+	Avatar        string `json:"avatar"`
+	OfficialCount int    `json:"officialCount"`
+}

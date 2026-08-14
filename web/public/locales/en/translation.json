@@ -87,7 +87,9 @@
   },
   "officialPage": {
     "title": "Official Skills",
-    "desc": "High-quality skills maintained and certified by official teams — {n} in total"
+    "desc": "High-quality skills maintained and certified by official teams — {n} in total",
+    "orgDesc": "Official skills by {name} — {n} in total",
+    "back": "Back to all official skills"
   },
   "author": {
     "notFound": "Author not found",

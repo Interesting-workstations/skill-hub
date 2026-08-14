@@ -87,7 +87,9 @@
   },
   "officialPage": {
     "title": "官方技能",
-    "desc": "由官方维护和认证的高质量技能，共 {n} 个"
+    "desc": "由官方维护和认证的高质量技能，共 {n} 个",
+    "orgDesc": "{name} 的官方技能，共 {n} 个",
+    "back": "返回全部官方技能"
   },
   "author": {
     "notFound": "作者未找到",

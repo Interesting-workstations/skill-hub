@@ -20,6 +20,8 @@ type Repository interface {
 	AllAuthors() []domain.Author
 	// AllCategories 返回全部分类（含分类下技能）。
 	AllCategories() []domain.Category
+	// OfficialOrgSummaries 返回官方组织概览（含各组织官方技能数，启用且按排序）。
+	OfficialOrgSummaries() []domain.OfficialOrgSummary
 
 	// ListArticles 返回全部已发布文章。
 	ListArticles() []domain.Article
@@ -87,6 +89,10 @@ func (r *memoryRepo) AllAuthors() []domain.Author {
 
 func (r *memoryRepo) AllCategories() []domain.Category {
 	return r.store.SkillCategories
+}
+
+func (r *memoryRepo) OfficialOrgSummaries() []domain.OfficialOrgSummary {
+	return nil
 }
 
 // ---------- 公开内容（内存实现返回空/默认值） ----------

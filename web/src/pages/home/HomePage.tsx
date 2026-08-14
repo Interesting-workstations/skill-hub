@@ -2,7 +2,7 @@ import Hero from "../../components/sections/Hero";
 import SponsorBanner from "../../components/sections/SponsorBanner";
 import OfficialAuthors from "../../components/sections/OfficialAuthors";
 import SkillSection from "../../components/sections/SkillSection";
-import { useAuthors, useCategories, useSkills } from "../../hooks/useSkillData";
+import { useCategories, useOfficialOrgs, useSkills } from "../../hooks/useSkillData";
 import { usePageAnimation } from "../../hooks/usePageAnimation";
 import { usePageMeta } from "../../hooks/usePageMeta";
 import PageLoading from "../../components/shared/PageLoading";
@@ -14,10 +14,10 @@ export default function HomePage() {
   const pageRef = usePageAnimation();
   const { data: featuredSkills } = useSkills({ featured: true });
   const { data: categories } = useCategories();
-  const { data: authors } = useAuthors();
+  const { data: officialOrgs } = useOfficialOrgs();
 
   // 首页内容依赖数据，未就绪时显示全局加载
-  if (!featuredSkills || !categories || !authors) {
+  if (!featuredSkills || !categories) {
     return <PageLoading />;
   }
 
@@ -25,7 +25,7 @@ export default function HomePage() {
     <div ref={pageRef}>
       <Hero />
       <SponsorBanner />
-      <OfficialAuthors authors={authors} />
+      <OfficialAuthors orgs={officialOrgs ?? []} />
       <SkillSection
         title={t("featured.title")}
         count={featuredSkills.length}

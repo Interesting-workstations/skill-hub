@@ -1,11 +1,11 @@
 import { Link } from "react-router-dom";
-import type { Author } from "../../data/types";
+import type { OfficialOrgSummary } from "../../data/types";
 import { cardHoverEnter, cardHoverLeave } from "../../animations";
 import { useI18n } from "../../i18n";
 import "./OfficialAuthors.css";
 
 interface Props {
-  authors: Author[];
+  orgs: OfficialOrgSummary[];
 }
 
 const handleMouseEnter = (e: React.MouseEvent<HTMLAnchorElement>) => {
@@ -15,12 +15,15 @@ const handleMouseLeave = (e: React.MouseEvent<HTMLAnchorElement>) => {
   cardHoverLeave(e.currentTarget);
 };
 
-export default function OfficialAuthors({ authors }: Props) {
+export default function OfficialAuthors({ orgs }: Props) {
   const { t } = useI18n();
-  // 只展示发布了官方技能的作者，数量为该作者的官方技能数
-  const official = authors
-    .filter((a) => (a.officialSkills ?? 0) > 0)
-    .sort((a, b) => (b.officialSkills ?? 0) - (a.officialSkills ?? 0));
+  // 只展示发布了官方技能的组织，按官方技能数降序（与官方组织表统一）
+  const official = orgs
+    .filter((o) => o.officialCount > 0)
+    .sort((a, b) => b.officialCount - a.officialCount);
+  if (official.length === 0) {
+    return null;
+  }
   return (
     <section className="official-section">
       <div className="official-header">
@@ -30,18 +33,18 @@ export default function OfficialAuthors({ authors }: Props) {
         </Link>
       </div>
       <div className="official-grid">
-        {official.map((author) => (
+        {official.map((org) => (
           <Link
-            key={author.slug}
-            to={`/author/${author.slug}`}
+            key={org.owner}
+            to={`/official?org=${encodeURIComponent(org.owner)}`}
             className="author-card"
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
           >
-            <span className="author-avatar">{author.avatar}</span>
+            <span className="author-avatar">{org.avatar}</span>
             <div className="author-info">
-              <h3 className="author-name">{author.name}</h3>
-              <p className="author-count">{t("official.skillCount", { n: author.officialSkills ?? 0 })}</p>
+              <h3 className="author-name">{org.displayName}</h3>
+              <p className="author-count">{t("official.skillCount", { n: org.officialCount })}</p>
             </div>
           </Link>
         ))}

@@ -183,6 +183,11 @@ func (s *Service) ListCategories() []domain.Category {
 	return s.repo.AllCategories()
 }
 
+// ListOfficialOrgs 返回官方组织概览（官网「官方技能/官方组织」区块统一数据源）。
+func (s *Service) ListOfficialOrgs() []domain.OfficialOrgSummary {
+	return s.repo.OfficialOrgSummaries()
+}
+
 // GetCategory 按 slug 返回分类及其技能。
 func (s *Service) GetCategory(slug string) (domain.Category, bool) {
 	for _, c := range s.repo.AllCategories() {

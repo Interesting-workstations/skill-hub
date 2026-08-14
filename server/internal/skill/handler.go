@@ -39,6 +39,8 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/authors/{slug}", h.getAuthor)
 	mux.HandleFunc("GET /api/v1/categories", h.listCategories)
 	mux.HandleFunc("GET /api/v1/categories/{slug}", h.getCategory)
+	// 官方组织概览（官方技能 / 官方组织统一数据源）
+	mux.HandleFunc("GET /api/v1/official-orgs", h.listOfficialOrgs)
 	// 公开内容：文章 / 站点配置 / SEO（admin 管理，官网读取）
 	mux.HandleFunc("GET /api/v1/articles", h.listArticles)
 	mux.HandleFunc("GET /api/v1/articles/{id}", h.getArticle)
@@ -265,6 +267,11 @@ func (h *Handler) getCategory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	response.OK(w, cat)
+}
+
+// GET /api/v1/official-orgs —— 官方组织概览（含各组织官方技能数）。
+func (h *Handler) listOfficialOrgs(w http.ResponseWriter, _ *http.Request) {
+	response.OK(w, h.svc.ListOfficialOrgs())
 }
 
 // POST /api/v1/skills/submit —— 用户提交技能（进入待审核）。

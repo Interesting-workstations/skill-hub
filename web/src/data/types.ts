@@ -42,6 +42,14 @@ export interface AuthorDetail {
   skills: Skill[];
 }
 
+/** 官方组织概览（官网「官方技能 / 官方组织」统一数据源，含各组织官方技能数） */
+export interface OfficialOrgSummary {
+  owner: string;
+  displayName: string;
+  avatar: string;
+  officialCount: number;
+}
+
 /** 站点聚合统计 */
 export interface Stats {
   totalSkills: number;

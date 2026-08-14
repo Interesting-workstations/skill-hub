@@ -343,6 +343,37 @@ func (r *mysqlRepo) AllCategories() []domain.Category {
 	return categories
 }
 
+// OfficialOrgSummaries 返回官方组织概览：启用中的官方组织及其官方技能数。
+// 官方组织表（official_orgs）为唯一数据源，按展示名去重（如 anthropics/anthropic 归并为 Anthropic）。
+func (r *mysqlRepo) OfficialOrgSummaries() []domain.OfficialOrgSummary {
+	rows, err := r.db.Query(`
+		SELECT MIN(o.owner), o.display_name, MIN(o.avatar),
+			COALESCE(agg.official_count, 0)
+		FROM official_orgs o
+		LEFT JOIN (
+			SELECT author, SUM(is_official) AS official_count
+			FROM skills
+			GROUP BY author
+		) agg ON agg.author = o.display_name
+		WHERE o.enabled = 1
+		GROUP BY o.display_name, agg.official_count
+		ORDER BY MIN(o.sort_order), o.display_name`)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+
+	out := make([]domain.OfficialOrgSummary, 0, 24)
+	for rows.Next() {
+		var o domain.OfficialOrgSummary
+		if err := rows.Scan(&o.Owner, &o.DisplayName, &o.Avatar, &o.OfficialCount); err != nil {
+			continue
+		}
+		out = append(out, o)
+	}
+	return out
+}
+
 func (r *mysqlRepo) skillsByCategory(slug string) []domain.Skill {
 	rows, err := r.db.Query(`SELECT id, name, author, description, category,
 		download_url, is_official, is_featured, install_command, github_url,
