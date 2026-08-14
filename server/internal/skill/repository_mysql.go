@@ -301,28 +301,35 @@ func (r *mysqlRepo) SkillByIDAny(id string) (domain.Skill, bool) {
 	return s, ok
 }
 
-// AllAuthors 返回全部作者；SkillCount 为该作者下已发布技能数、
-// OfficialSkills 为官方技能数（均实时统计，只统计已发布）。
+// AllAuthors 返回全部作者（实时从已发布技能派生，不依赖静态 authors 表，
+// 否则爬虫入库的新作者在作者页会「未找到」）。
+// SkillCount / OfficialSkills 为该作者的已发布技能数与官方技能数；
+// Slug 为小写作者名（供前端 /author/:slug 路由匹配）。
 func (r *mysqlRepo) AllAuthors() []domain.Author {
 	rows, err := r.db.Query(`
-		SELECT a.slug, a.name, a.avatar,
+		SELECT s.author,
+			COALESCE(a.name, s.author),
+			COALESCE(a.avatar, '👤'),
 			COUNT(s.id),
 			COALESCE(SUM(s.is_official), 0)
-		FROM authors a
-		LEFT JOIN skills s ON s.author = a.slug AND s.data_status = 'published'
-		GROUP BY a.slug, a.name, a.avatar
-		ORDER BY a.slug`)
+		FROM skills s
+		LEFT JOIN authors a ON LOWER(a.slug) = LOWER(s.author) OR a.name = s.author
+		WHERE s.data_status = 'published'
+		GROUP BY s.author, a.name, a.avatar
+		ORDER BY COUNT(s.id) DESC`)
 	if err != nil {
 		return nil
 	}
 	defer rows.Close()
 
-	authors := make([]domain.Author, 0, 16)
+	authors := make([]domain.Author, 0, 32)
 	for rows.Next() {
 		var a domain.Author
-		if err := rows.Scan(&a.Slug, &a.Name, &a.Avatar, &a.SkillCount, &a.OfficialSkills); err != nil {
+		var raw string
+		if err := rows.Scan(&raw, &a.Name, &a.Avatar, &a.SkillCount, &a.OfficialSkills); err != nil {
 			continue
 		}
+		a.Slug = strings.ToLower(strings.TrimSpace(raw))
 		authors = append(authors, a)
 	}
 	return authors
