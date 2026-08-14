@@ -9,6 +9,7 @@ const AuthorPage = lazy(() => import("../../pages/author/AuthorPage"));
 const CategoryPage = lazy(() => import("../../pages/category/CategoryPage"));
 const CategoriesPage = lazy(() => import("../../pages/categories/CategoriesPage"));
 const OfficialPage = lazy(() => import("../../pages/official/OfficialPage"));
+const OrgsPage = lazy(() => import("../../pages/orgs/OrgsPage"));
 const FeaturedPage = lazy(() => import("../../pages/featured/FeaturedPage"));
 const ArticlesPage = lazy(() => import("../../pages/articles/ArticlesPage"));
 const ArticleDetailPage = lazy(() => import("../../pages/articles/ArticleDetailPage"));
@@ -28,6 +29,7 @@ export const routes: RouteConfig[] = [
   { path: "/category/:slug", element: <CategoryPage /> },
   { path: "/categories", element: <CategoriesPage /> },
   { path: "/official", element: <OfficialPage /> },
+  { path: "/orgs", element: <OrgsPage /> },
   { path: "/featured", element: <FeaturedPage /> },
   { path: "/articles", element: <ArticlesPage /> },
   { path: "/articles/:id", element: <ArticleDetailPage /> },

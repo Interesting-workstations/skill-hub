@@ -49,6 +49,11 @@ export default function OfficialAuthors({ orgs }: Props) {
           </Link>
         ))}
       </div>
+      <div className="official-more">
+        <Link to="/orgs" className="official-more-link">
+          {t("orgs.viewAll", { n: orgs.length })} <span className="official-arrow">→</span>
+        </Link>
+      </div>
     </section>
   );
 }

@@ -121,6 +121,9 @@ export default function Navbar() {
         <Link to="/official" className="navbar-menu-link" onClick={() => setMenuOpen(false)}>
           {t("nav.official")}
         </Link>
+        <Link to="/orgs" className="navbar-menu-link" onClick={() => setMenuOpen(false)}>
+          {t("nav.orgs")}
+        </Link>
         <Link to="/featured" className="navbar-menu-link" onClick={() => setMenuOpen(false)}>
           {t("nav.featured")}
         </Link>

@@ -11,6 +11,7 @@
     "submit": "Submit",
     "openMenu": "Open menu",
     "official": "Official",
+    "orgs": "Official Orgs",
     "featured": "Featured",
     "categories": "Categories",
     "submitSkill": "Submit a Skill",
@@ -90,6 +91,13 @@
     "desc": "High-quality skills maintained and certified by official teams — {n} in total",
     "orgDesc": "Official skills by {name} — {n} in total",
     "back": "Back to all official skills"
+  },
+  "orgs": {
+    "title": "Official Orgs",
+    "desc": "{total} official orgs curated, {n} with official skills",
+    "pending": "No skills yet",
+    "skillCount": "{n} official skills",
+    "viewAll": "View all {n} official orgs"
   },
   "author": {
     "notFound": "Author not found",

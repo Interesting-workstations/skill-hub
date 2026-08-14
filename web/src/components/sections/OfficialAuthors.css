@@ -33,6 +33,26 @@
   color: var(--color-text-muted);
 }
 
+.official-more {
+  margin-top: 14px;
+  text-align: right;
+}
+
+.official-more-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--color-primary);
+  text-decoration: none;
+  font-weight: 500;
+  transition: opacity 0.2s;
+}
+
+.official-more-link:hover {
+  opacity: 0.8;
+}
+
 .official-grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
