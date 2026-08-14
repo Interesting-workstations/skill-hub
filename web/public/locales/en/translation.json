@@ -1,0 +1,132 @@
+{
+  "brand": {
+    "name": "Agent Skills",
+    "title": "Agent Skills — Reusable Skills for AI Coding Assistants",
+    "description": "Discover reusable skills for AI coding assistants like Claude Code and Codex. Each skill is a bundle of instructions and code that teaches your AI assistant to perform professional tasks and automate complex workflows."
+  },
+  "nav": {
+    "language": "简体中文",
+    "zh": "简体中文",
+    "en": "English",
+    "submit": "Submit",
+    "openMenu": "Open menu",
+    "official": "Official",
+    "featured": "Featured",
+    "categories": "Categories",
+    "submitSkill": "Submit a Skill"
+  },
+  "footer": {
+    "browse": "Browse",
+    "official": "Official Skills",
+    "featured": "Featured Skills",
+    "categories": "All Categories",
+    "articles": "Articles & Tutorials",
+    "contribute": "Contribute",
+    "submitSkill": "Submit a Skill"
+  },
+  "hero": {
+    "titleMain": "Agent Skills",
+    "titleAccent": "",
+    "description": "Discover reusable skills for AI coding assistants like Claude Code and Codex. Each skill is a bundle of instructions and code that teaches your AI assistant to perform professional tasks and automate complex workflows.",
+    "stat": {
+      "skills": "Skills",
+      "authors": "Official Authors",
+      "categories": "Categories",
+      "official": "Official Skills"
+    },
+    "cta": {
+      "browse": "Browse Skills",
+      "submit": "Submit a Skill",
+      "learnMore": "Learn more about Skills →"
+    }
+  },
+  "official": {
+    "title": "Official Skills",
+    "skillCount": "{n} skills"
+  },
+  "sponsor": {
+    "badge": "Sponsored"
+  },
+  "card": {
+    "download": "Download ZIP"
+  },
+  "detail": {
+    "notFound": "Skill not found",
+    "backHome": "Back to Home",
+    "authorLabel": "By ",
+    "copyInstall": "Copy install command",
+    "downloadZip": "Download ZIP",
+    "license": "License: {license}",
+    "advertise": "Advertise?",
+    "contactUs": "Contact us →",
+    "moreFrom": "More skills from {author}",
+    "overview": "Overview"
+  },
+  "breadcrumb": {
+    "home": "Agent Skills"
+  },
+  "categories": {
+    "title": "All Categories",
+    "featured": "Featured",
+    "skillCount": "{n} skills"
+  },
+  "category": {
+    "skillCount": "{n} skills in total",
+    "empty": "No skills in this category yet."
+  },
+  "featured": {
+    "title": "Featured Skills",
+    "desc": "Editor-picked high-quality skills — {n} in total"
+  },
+  "officialPage": {
+    "title": "Official Skills",
+    "desc": "High-quality skills maintained and certified by official teams — {n} in total"
+  },
+  "author": {
+    "notFound": "Author not found",
+    "backHome": "Back to Home",
+    "skillCount": "Published {n} skills",
+    "empty": "This author hasn't published any skills yet.",
+    "desc": "Browse all skills published by {name}"
+  },
+  "articles": {
+    "title": "Articles & Tutorials",
+    "desc": "Official tutorials and announcements for skills",
+    "empty": "No articles yet. Stay tuned!",
+    "back": "← Back to articles"
+  },
+  "article": {
+    "notFound": "Article not found or removed",
+    "noContent": "No content yet"
+  },
+  "notFound": {
+    "title": "Page Not Found",
+    "desc": "The page you visited does not exist or has been removed.",
+    "backHome": "Back to Home"
+  },
+  "submit": {
+    "title": "Submit a Skill",
+    "meta": "Share an Agent Skill you created to help more developers get more out of AI coding. Submissions enter a review queue and appear in the library once approved.",
+    "successTitle": "Submitted!",
+    "successDesc": "Your skill has been added to the review queue. It will appear in the library once an admin approves it.",
+    "backHome": "Back to Home",
+    "name": "Skill Name",
+    "namePlaceholder": "e.g. Frontend Design",
+    "author": "Author / Maintainer",
+    "authorPlaceholder": "Your GitHub username or team name",
+    "githubUrl": "GitHub Repository URL",
+    "githubUrlPlaceholder": "https://github.com/your-username/your-skill",
+    "description": "Short Description",
+    "descriptionPlaceholder": "Describe what this skill does in one sentence...",
+    "category": "Category Tags",
+    "categoryPlaceholder": "development, testing, creative...",
+    "tagsHint": "Separate multiple tags with commas",
+    "error": "Submission failed. Please try again later.",
+    "submitting": "Submitting…"
+  },
+  "error": {
+    "title": "Something went wrong",
+    "desc": "An error occurred while loading this page. Please refresh and try again.",
+    "reload": "Reload Page"
+  }
+}

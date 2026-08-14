@@ -1,11 +1,13 @@
 /**
  * 中英文切换 —— 基于官方 i18next + react-i18next。
  *
- * - 语言资源：web/src/i18n/locales/{zh,en}.ts（标准 i18next 资源文件）
+ * - 语言包：public/locales/{zh,en}/translation.json（可独立下载 / 更新）
+ * - 加载：官方 i18next-http-backend 按需 HTTP 下载语言包
+ * - 检测 / 持久化：官方 i18next-browser-languagedetector
+ *   （优先读 localStorage key=skillhub-lang，其次浏览器语言；切换后写回 localStorage）
  * - 插值使用单花括号 {n}/{author}（init 时配置 interpolation prefix/suffix）
- * - 语言选择持久化到 localStorage（key: skillhub-lang），并同步 <html lang>
  *
- * 用法（与之前自研版本 API 完全一致，组件无需改动）：
+ * 用法（组件 API 不变）：
  *   const { lang, setLang, toggleLang, t } = useI18n();
  *   t("nav.submit")                    // 普通文案
  *   t("detail.moreFrom", { author })   // {author} 插值
@@ -13,8 +15,8 @@
 import type { ReactNode } from "react";
 import i18n from "i18next";
 import { initReactI18next, useTranslation } from "react-i18next";
-import zh from "./locales/zh";
-import en from "./locales/en";
+import HttpBackend from "i18next-http-backend";
+import LanguageDetector from "i18next-browser-languagedetector";
 
 export type Lang = "zh" | "en";
 
@@ -30,38 +32,38 @@ export interface I18nValue {
   t: (key: string, vars?: Record<string, string | number>) => string;
 }
 
-function loadInitialLang(): Lang {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    return saved === "en" ? "en" : "zh";
-  } catch {
-    return "zh";
-  }
-}
+// 初始化官方 i18next：HTTP 下载语言包 + 语言检测/持久化
+void i18n
+  .use(HttpBackend)
+  .use(LanguageDetector)
+  .use(initReactI18next)
+  .init({
+    supportedLngs: ["zh", "en"],
+    fallbackLng: "zh",
+    // 语言包下载路径：public/locales/{lng}/translation.json
+    backend: {
+      loadPath: "/locales/{{lng}}/translation.json",
+    },
+    detection: {
+      // 先读 localStorage 已选语言，其次浏览器语言；切换后写回 localStorage
+      order: ["localStorage", "navigator"],
+      caches: ["localStorage"],
+      lookupLocalStorage: STORAGE_KEY,
+    },
+    // 与既有字典兼容：使用单花括号插值（官方默认是 {{var}}）
+    interpolation: {
+      escapeValue: false,
+      prefix: "{",
+      suffix: "}",
+    },
+    // 语言包异步下载期间不启用 Suspense，避免首屏白屏
+    react: {
+      useSuspense: false,
+    },
+  });
 
-// 初始化官方 i18next（浏览器侧全局单例）
-void i18n.use(initReactI18next).init({
-  resources: {
-    zh: { translation: zh },
-    en: { translation: en },
-  },
-  lng: loadInitialLang(),
-  fallbackLng: "zh",
-  // 与既有字典兼容：使用单花括号插值（官方默认是 {{var}}）
-  interpolation: {
-    escapeValue: false,
-    prefix: "{",
-    suffix: "}",
-  },
-});
-
-// 语言变化：持久化 + 同步 <html lang>
+// 语言变化：同步 <html lang>（localStorage 持久化由 LanguageDetector 负责）
 i18n.on("languageChanged", (lng: string) => {
-  try {
-    localStorage.setItem(STORAGE_KEY, lng);
-  } catch {
-    /* 忽略隐私模式等异常 */
-  }
   document.documentElement.lang = lng;
 });
 

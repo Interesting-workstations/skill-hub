@@ -1,0 +1,132 @@
+{
+  "brand": {
+    "name": "Agent Skills 资源库",
+    "title": "Agent Skills 资源库 — AI 编程助手的可复用技能",
+    "description": "发现适用于 Claude Code、Codex 等 AI 编程助手的可复用技能。每个技能都是一组指令和代码包，教会你的 AI 助手执行专业任务并自动化复杂工作流。"
+  },
+  "nav": {
+    "language": "简体中文",
+    "zh": "简体中文",
+    "en": "English",
+    "submit": "提交",
+    "openMenu": "打开菜单",
+    "official": "官方技能",
+    "featured": "精选技能",
+    "categories": "全部分类",
+    "submitSkill": "提交技能"
+  },
+  "footer": {
+    "browse": "浏览",
+    "official": "官方技能",
+    "featured": "精选技能",
+    "categories": "全部分类",
+    "articles": "文章与教程",
+    "contribute": "贡献",
+    "submitSkill": "提交技能"
+  },
+  "hero": {
+    "titleMain": "Agent Skills",
+    "titleAccent": " 资源库",
+    "description": "发现适用于 Claude Code、Codex 等 AI 编程助手的可复用技能。每个技能都是一组指令和代码包，教会你的 AI 助手执行专业任务并自动化复杂工作流。",
+    "stat": {
+      "skills": "收录技能",
+      "authors": "官方作者",
+      "categories": "技能分类",
+      "official": "官方技能"
+    },
+    "cta": {
+      "browse": "浏览技能",
+      "submit": "提交技能",
+      "learnMore": "了解更多关于 Skills →"
+    }
+  },
+  "official": {
+    "title": "官方技能",
+    "skillCount": "{n} 个技能"
+  },
+  "sponsor": {
+    "badge": "赞助"
+  },
+  "card": {
+    "download": "下载 ZIP"
+  },
+  "detail": {
+    "notFound": "技能未找到",
+    "backHome": "返回首页",
+    "authorLabel": "作者：",
+    "copyInstall": "复制安装命令",
+    "downloadZip": "下载 ZIP",
+    "license": "许可：{license}",
+    "advertise": "投放广告？",
+    "contactUs": "联系我们 →",
+    "moreFrom": "来自 {author} 的更多技能",
+    "overview": "概述"
+  },
+  "breadcrumb": {
+    "home": "Agent Skills 资源库"
+  },
+  "categories": {
+    "title": "全部分类",
+    "featured": "精选技能",
+    "skillCount": "{n} 个技能"
+  },
+  "category": {
+    "skillCount": "共 {n} 个技能",
+    "empty": "该分类暂无技能。"
+  },
+  "featured": {
+    "title": "精选技能",
+    "desc": "编辑精选的高质量技能，共 {n} 个"
+  },
+  "officialPage": {
+    "title": "官方技能",
+    "desc": "由官方维护和认证的高质量技能，共 {n} 个"
+  },
+  "author": {
+    "notFound": "作者未找到",
+    "backHome": "返回首页",
+    "skillCount": "共发布 {n} 个技能",
+    "empty": "该作者暂无已收录的技能。",
+    "desc": "浏览 {name} 发布的全部技能"
+  },
+  "articles": {
+    "title": "文章与教程",
+    "desc": "官方发布的技能使用教程与公告",
+    "empty": "暂无文章，敬请期待",
+    "back": "← 返回文章列表"
+  },
+  "article": {
+    "notFound": "文章不存在或已下线",
+    "noContent": "暂无正文"
+  },
+  "notFound": {
+    "title": "页面未找到",
+    "desc": "你访问的页面不存在或已被移除。",
+    "backHome": "返回首页"
+  },
+  "submit": {
+    "title": "提交技能",
+    "meta": "分享你创建的 Agent Skill，帮助更多开发者提升 AI 编程体验。提交后进入待审核，审核通过后展示在资源库。",
+    "successTitle": "提交成功！",
+    "successDesc": "你的技能已提交到待审核队列，管理员审核通过后将出现在资源库中。",
+    "backHome": "返回首页",
+    "name": "技能名称",
+    "namePlaceholder": "例如：Frontend Design",
+    "author": "作者 / 维护者",
+    "authorPlaceholder": "你的 GitHub 用户名或团队名",
+    "githubUrl": "GitHub 仓库地址",
+    "githubUrlPlaceholder": "https://github.com/your-username/your-skill",
+    "description": "简短描述",
+    "descriptionPlaceholder": "用一句话描述这个技能的功能...",
+    "category": "分类标签",
+    "categoryPlaceholder": "development, testing, creative...",
+    "tagsHint": "多个标签用逗号分隔",
+    "error": "提交失败，请稍后重试",
+    "submitting": "提交中…"
+  },
+  "error": {
+    "title": "出错了",
+    "desc": "页面加载出现异常，请刷新重试。",
+    "reload": "刷新页面"
+  }
+}
