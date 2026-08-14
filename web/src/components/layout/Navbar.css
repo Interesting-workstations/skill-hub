@@ -77,6 +77,18 @@
   display: flex;
   flex-direction: column;
   z-index: 120;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-6px);
+  transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s;
+  pointer-events: none;
+}
+
+.lang-menu.open {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  pointer-events: auto;
 }
 
 .lang-option {
@@ -131,21 +143,41 @@
   background: var(--color-surface-hover);
 }
 
-/* 移动端下拉菜单 */
+/* 下拉菜单：绝对定位浮层，覆盖在内容上方，不撑高导航栏也不推动内容 */
 .navbar-menu {
+  position: absolute;
+  top: 60px;
+  left: 0;
+  right: 0;
   display: flex;
   flex-direction: column;
   padding: 8px 24px 16px;
   border-bottom: 1px solid var(--color-border);
   background: var(--color-surface);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  z-index: 110;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-8px);
+  transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s;
+  pointer-events: none;
+}
+
+.navbar-menu.open {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  pointer-events: auto;
 }
 
 .navbar-menu-link {
-  padding: 11px 0;
+  padding: 11px 12px;
   font-size: 15px;
   color: var(--color-text);
   text-decoration: none;
   border-bottom: 1px solid var(--color-surface-hover);
+  border-radius: 8px;
+  transition: color 0.15s, background 0.15s;
 }
 
 .navbar-menu-link:last-child {
@@ -154,6 +186,7 @@
 
 .navbar-menu-link:hover {
   color: var(--color-primary);
+  background: var(--color-surface-hover);
 }
 
 @media (max-width: 640px) {

@@ -68,26 +68,24 @@ export default function Navbar() {
                 <path d="M3 5l3 3 3-3" stroke="currentColor" strokeWidth="1.5" fill="none" />
               </svg>
             </button>
-            {langOpen && (
-              <div className="lang-menu" role="listbox">
-                <button
-                  className={`lang-option${lang === "zh" ? " active" : ""}`}
-                  onClick={() => selectLang("zh")}
-                  role="option"
-                  aria-selected={lang === "zh"}
-                >
-                  简体中文
-                </button>
-                <button
-                  className={`lang-option${lang === "en" ? " active" : ""}`}
-                  onClick={() => selectLang("en")}
-                  role="option"
-                  aria-selected={lang === "en"}
-                >
-                  English
-                </button>
-              </div>
-            )}
+            <div className={`lang-menu${langOpen ? " open" : ""}`} role="listbox">
+              <button
+                className={`lang-option${lang === "zh" ? " active" : ""}`}
+                onClick={() => selectLang("zh")}
+                role="option"
+                aria-selected={lang === "zh"}
+              >
+                简体中文
+              </button>
+              <button
+                className={`lang-option${lang === "en" ? " active" : ""}`}
+                onClick={() => selectLang("en")}
+                role="option"
+                aria-selected={lang === "en"}
+              >
+                English
+              </button>
+            </div>
           </div>
           <Link
             to="/submit"
@@ -117,22 +115,20 @@ export default function Navbar() {
         </div>
       </div>
 
-      {menuOpen && (
-        <div className="navbar-menu">
-          <Link to="/official" className="navbar-menu-link" onClick={() => setMenuOpen(false)}>
-            {t("nav.official")}
-          </Link>
-          <Link to="/featured" className="navbar-menu-link" onClick={() => setMenuOpen(false)}>
-            {t("nav.featured")}
-          </Link>
-          <Link to="/categories" className="navbar-menu-link" onClick={() => setMenuOpen(false)}>
-            {t("nav.categories")}
-          </Link>
-          <Link to="/submit" className="navbar-menu-link" onClick={() => setMenuOpen(false)}>
-            {t("nav.submitSkill")}
-          </Link>
-        </div>
-      )}
+      <div className={`navbar-menu${menuOpen ? " open" : ""}`}>
+        <Link to="/official" className="navbar-menu-link" onClick={() => setMenuOpen(false)}>
+          {t("nav.official")}
+        </Link>
+        <Link to="/featured" className="navbar-menu-link" onClick={() => setMenuOpen(false)}>
+          {t("nav.featured")}
+        </Link>
+        <Link to="/categories" className="navbar-menu-link" onClick={() => setMenuOpen(false)}>
+          {t("nav.categories")}
+        </Link>
+        <Link to="/submit" className="navbar-menu-link" onClick={() => setMenuOpen(false)}>
+          {t("nav.submitSkill")}
+        </Link>
+      </div>
     </nav>
   );
 }
