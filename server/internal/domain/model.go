@@ -12,8 +12,10 @@ type ContentSection struct {
 type Skill struct {
 	ID             string   `json:"id"`
 	Name           string   `json:"name"`
+	NameZh         string   `json:"nameZh,omitempty"` // 中文标题（切换语言用，无翻译为空）
 	Author         string   `json:"author"`
 	Description    string   `json:"description"`
+	DescriptionZh  string   `json:"descriptionZh,omitempty"` // 中文描述
 	Tags           []string `json:"tags"`
 	Category       string   `json:"category"`
 	DownloadURL    string   `json:"downloadUrl"`

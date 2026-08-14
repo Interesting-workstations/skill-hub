@@ -94,8 +94,10 @@ func (r *mysqlRepo) migrate() error {
 		`CREATE TABLE IF NOT EXISTS skills (
 			id VARCHAR(150) PRIMARY KEY,
 			name VARCHAR(255) NOT NULL,
+			name_zh VARCHAR(255) NOT NULL DEFAULT '',
 			author VARCHAR(255) NOT NULL,
 			description TEXT NOT NULL,
+			description_zh TEXT,
 			category VARCHAR(100) NOT NULL,
 			download_url VARCHAR(500) NOT NULL DEFAULT '',
 			is_official TINYINT(1) NOT NULL DEFAULT 0,
@@ -126,7 +128,25 @@ func (r *mysqlRepo) migrate() error {
 	if err := r.ensureDataStatusColumn(); err != nil {
 		return err
 	}
-	return r.ensureSkillPathColumn()
+	if err := r.ensureSkillPathColumn(); err != nil {
+		return err
+	}
+	return r.ensureZhColumns()
+}
+
+// ensureZhColumns 给已存在的 skills 表补充中文翻译列（name_zh / description_zh）。
+func (r *mysqlRepo) ensureZhColumns() error {
+	if _, err := r.db.Exec(`ALTER TABLE skills ADD COLUMN name_zh VARCHAR(255) NOT NULL DEFAULT ''`); err != nil {
+		if !strings.Contains(err.Error(), "Duplicate column") {
+			return err
+		}
+	}
+	if _, err := r.db.Exec(`ALTER TABLE skills ADD COLUMN description_zh TEXT`); err != nil {
+		if !strings.Contains(err.Error(), "Duplicate column") {
+			return err
+		}
+	}
+	return nil
 }
 
 // ensureSkillPathColumn 给已存在的 skills 表补充 skill_path（技能目录）列。
@@ -266,7 +286,7 @@ func insertSkill(tx *sql.Tx, s domain.Skill) error {
 
 // AllSkills 返回全部已发布技能（未审核/未发布的记录不出现在官网）。
 func (r *mysqlRepo) AllSkills() []domain.Skill {
-	rows, err := r.db.Query(`SELECT id, name, author, description, category,
+	rows, err := r.db.Query(`SELECT id, name, name_zh, author, description, description_zh, category,
 		download_url, is_official, is_featured, install_command, github_url,
 		github_stars, license, skill_path, tags, content FROM skills WHERE data_status = 'published'`)
 	if err != nil {
@@ -285,7 +305,7 @@ func (r *mysqlRepo) AllSkills() []domain.Skill {
 
 // SkillByID 按 ID 查询已发布技能（未发布的记录官网不可见）。
 func (r *mysqlRepo) SkillByID(id string) (domain.Skill, bool) {
-	row := r.db.QueryRow(`SELECT id, name, author, description, category,
+	row := r.db.QueryRow(`SELECT id, name, name_zh, author, description, description_zh, category,
 		download_url, is_official, is_featured, install_command, github_url,
 		github_stars, license, skill_path, tags, content FROM skills WHERE id = ? AND data_status = 'published'`, id)
 	s, ok := scanSkill(row)
@@ -294,7 +314,7 @@ func (r *mysqlRepo) SkillByID(id string) (domain.Skill, bool) {
 
 // SkillByIDAny 按 ID 查询技能（不限状态，供用户提交技能时 ID 查重）。
 func (r *mysqlRepo) SkillByIDAny(id string) (domain.Skill, bool) {
-	row := r.db.QueryRow(`SELECT id, name, author, description, category,
+	row := r.db.QueryRow(`SELECT id, name, name_zh, author, description, description_zh, category,
 		download_url, is_official, is_featured, install_command, github_url,
 		github_stars, license, skill_path, tags, content FROM skills WHERE id = ?`, id)
 	s, ok := scanSkill(row)
@@ -405,7 +425,7 @@ func (r *mysqlRepo) OfficialOrgSummaries() []domain.OfficialOrgSummary {
 }
 
 func (r *mysqlRepo) skillsByCategory(slug string) []domain.Skill {
-	rows, err := r.db.Query(`SELECT id, name, author, description, category, download_url, is_official, is_featured,
+	rows, err := r.db.Query(`SELECT id, name, name_zh, author, description, description_zh, category, download_url, is_official, is_featured,
 		install_command, github_url, github_stars, license, skill_path, tags, content FROM skills WHERE category = ? AND data_status = 'published'`, slug)
 	if err != nil {
 		return nil
@@ -431,7 +451,7 @@ func scanSkill(scanner rowScanner) (domain.Skill, bool) {
 	var official, featured int
 	var tagsRaw, contentRaw string
 	err := scanner.Scan(
-		&s.ID, &s.Name, &s.Author, &s.Description, &s.Category,
+		&s.ID, &s.Name, &s.NameZh, &s.Author, &s.Description, &s.DescriptionZh, &s.Category,
 		&s.DownloadURL, &official, &featured, &s.InstallCommand, &s.GithubURL,
 		&s.GithubStars, &s.License, &s.SkillPath, &tagsRaw, &contentRaw,
 	)

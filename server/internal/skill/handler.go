@@ -79,7 +79,7 @@ func (h *Handler) listSkills(w http.ResponseWriter, r *http.Request) {
 	if err2 == nil {
 		filter.Featured = featured
 	}
-	response.OK(w, h.svc.ListSkills(filter))
+	response.OK(w, applyLang(h.svc.ListSkills(filter), q.Get("lang")))
 }
 
 // GET /api/v1/skills/{id}
@@ -90,7 +90,31 @@ func (h *Handler) getSkill(w http.ResponseWriter, r *http.Request) {
 		response.NotFound(w, "技能不存在")
 		return
 	}
+	applyLangOne(&skill, r.URL.Query().Get("lang"))
 	response.OK(w, skill)
+}
+
+// applyLang 按请求语言覆盖技能标题/描述：lang=zh 且有中文翻译时用中文，否则保留英文。
+func applyLang(skills []domain.Skill, lang string) []domain.Skill {
+	if lang != "zh" {
+		return skills
+	}
+	for i := range skills {
+		applyLangOne(&skills[i], lang)
+	}
+	return skills
+}
+
+func applyLangOne(s *domain.Skill, lang string) {
+	if lang != "zh" {
+		return
+	}
+	if s.NameZh != "" {
+		s.Name = s.NameZh
+	}
+	if s.DescriptionZh != "" {
+		s.Description = s.DescriptionZh
+	}
 }
 
 // GET /api/v1/skills/{id}/download —— 下载该技能的 ZIP。
@@ -257,12 +281,18 @@ func (h *Handler) getAuthor(w http.ResponseWriter, r *http.Request) {
 		response.NotFound(w, "作者不存在")
 		return
 	}
+	detail.Skills = applyLang(detail.Skills, r.URL.Query().Get("lang"))
 	response.OK(w, detail)
 }
 
 // GET /api/v1/categories
-func (h *Handler) listCategories(w http.ResponseWriter, _ *http.Request) {
-	response.OK(w, h.svc.ListCategories())
+func (h *Handler) listCategories(w http.ResponseWriter, r *http.Request) {
+	cats := h.svc.ListCategories()
+	lang := r.URL.Query().Get("lang")
+	for i := range cats {
+		cats[i].Skills = applyLang(cats[i].Skills, lang)
+	}
+	response.OK(w, cats)
 }
 
 // GET /api/v1/categories/{slug}
@@ -272,6 +302,7 @@ func (h *Handler) getCategory(w http.ResponseWriter, r *http.Request) {
 		response.NotFound(w, "分类不存在")
 		return
 	}
+	cat.Skills = applyLang(cat.Skills, r.URL.Query().Get("lang"))
 	response.OK(w, cat)
 }
 

@@ -10,9 +10,24 @@ interface ApiResponse<T> {
   data: T;
 }
 
+/**
+ * 当前界面语言（zh/en）：i18next 持久化在 localStorage key=skillhub-lang，
+ * 其次回退浏览器语言。请求自动附带 lang 参数，后端据此返回中文/英文标题与描述。
+ */
+export function currentLang(): string {
+  try {
+    const saved = localStorage.getItem("skillhub-lang");
+    if (saved) return saved.toLowerCase().startsWith("en") ? "en" : "zh";
+  } catch {
+    /* ignore */
+  }
+  return (navigator.language || "zh").toLowerCase().startsWith("en") ? "en" : "zh";
+}
+
 /** 发起请求并解包统一响应；业务错误（code !== 0）抛异常 */
 export async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE_URL}${path}`, init);
+  const sep = path.includes("?") ? "&" : "?";
+  const res = await fetch(`${API_BASE_URL}${path}${sep}lang=${currentLang()}`, init);
   if (!res.ok) {
     throw new Error(`请求失败（HTTP ${res.status}）`);
   }

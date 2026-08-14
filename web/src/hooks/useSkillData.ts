@@ -19,10 +19,12 @@ import {
   type SkillQuery,
 } from "../services/api/skills";
 import { useAsyncData, type AsyncState } from "./useAsyncData";
+import { useI18n } from "../i18n";
 
 /** 站点统计数据 */
 export function useStats(): AsyncState<Stats> {
-  return useAsyncData(fetchStats, []);
+  const { lang } = useI18n();
+  return useAsyncData(fetchStats, [lang]);
 }
 
 /**
@@ -30,47 +32,54 @@ export function useStats(): AsyncState<Stats> {
  * query 传 null 表示不请求（用于数据尚未就绪的场景）。
  */
 export function useSkills(query: SkillQuery | null = {}): AsyncState<Skill[]> {
+  const { lang } = useI18n();
   return useAsyncData(
     () => (query ? fetchSkills(query) : Promise.resolve([])),
-    [query?.category, query?.author, query?.official, query?.featured]
+    [query?.category, query?.author, query?.official, query?.featured, lang]
   );
 }
 
 /** 技能详情；id 未就绪时不请求 */
 export function useSkill(id: string | undefined): AsyncState<Skill> {
+  const { lang } = useI18n();
   return useAsyncData(
     () => (id ? fetchSkill(id) : Promise.resolve(null as unknown as Skill)),
-    [id]
+    [id, lang]
   );
 }
 
 /** 全部作者 */
 export function useAuthors(): AsyncState<Author[]> {
-  return useAsyncData(fetchAuthors, []);
+  const { lang } = useI18n();
+  return useAsyncData(fetchAuthors, [lang]);
 }
 
 /** 官方组织概览（官方技能 / 官方组织统一数据源） */
 export function useOfficialOrgs(): AsyncState<OfficialOrgSummary[]> {
-  return useAsyncData(fetchOfficialOrgs, []);
+  const { lang } = useI18n();
+  return useAsyncData(fetchOfficialOrgs, [lang]);
 }
 
 /** 作者详情（含技能）；slug 未就绪时不请求 */
 export function useAuthor(slug: string | undefined): AsyncState<AuthorDetail> {
+  const { lang } = useI18n();
   return useAsyncData(
     () => (slug ? fetchAuthor(slug) : Promise.resolve(null as unknown as AuthorDetail)),
-    [slug]
+    [slug, lang]
   );
 }
 
 /** 全部分类 */
 export function useCategories(): AsyncState<Category[]> {
-  return useAsyncData(fetchCategories, []);
+  const { lang } = useI18n();
+  return useAsyncData(fetchCategories, [lang]);
 }
 
 /** 分类详情（含技能）；slug 未就绪时不请求 */
 export function useCategory(slug: string | undefined): AsyncState<Category> {
+  const { lang } = useI18n();
   return useAsyncData(
     () => (slug ? fetchCategory(slug) : Promise.resolve(null as unknown as Category)),
-    [slug]
+    [slug, lang]
   );
 }

@@ -23,7 +23,7 @@ export default function CrawlerDataPage() {
 
   const load = async () => {
     setLoading(true);
-    const list = await contentApi.listData(filter || undefined);
+    const list = await contentApi.listData(filter ? { status: filter } : {});
     setData(list);
     setSelected([]);
     setPage(1);

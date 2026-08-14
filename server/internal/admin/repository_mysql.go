@@ -142,19 +142,21 @@ type AdminRecord struct {
 
 // InsertSkill 爬虫结果写入 skills 表所需的字段。
 type InsertSkill struct {
-	ID          string
-	Name        string
-	Author      string
-	Description string
-	Category    string
-	DownloadURL string
-	IsOfficial  bool
-	GithubURL   string
-	GithubStars string
-	License     string
-	SkillPath   string
-	Tags        []string
-	Content     []domain.ContentSection
+	ID            string
+	Name          string
+	NameZh        string
+	Author        string
+	Description   string
+	DescriptionZh string
+	Category      string
+	DownloadURL   string
+	IsOfficial    bool
+	GithubURL     string
+	GithubStars   string
+	License       string
+	SkillPath     string
+	Tags          []string
+	Content       []domain.ContentSection
 }
 
 type mysqlRepo struct {
@@ -1223,10 +1225,10 @@ func (r *mysqlRepo) InsertCrawledSkills(skills []InsertSkill) error {
 			dataStatus = "published"
 		}
 		if _, err := tx.Exec(
-			`INSERT INTO skills(id, name, author, description, category, download_url,
+			`INSERT INTO skills(id, name, name_zh, author, description, description_zh, category, download_url,
 				is_official, is_featured, install_command, github_url, github_stars, license, skill_path, tags, content, data_status)
-			 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-			s.ID, s.Name, s.Author, s.Description, s.Category, s.DownloadURL,
+			 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			s.ID, s.Name, s.NameZh, s.Author, s.Description, s.DescriptionZh, s.Category, s.DownloadURL,
 			official, 0, "", s.GithubURL, s.GithubStars, s.License, s.SkillPath, string(tags), string(content), dataStatus,
 		); err != nil {
 			return err

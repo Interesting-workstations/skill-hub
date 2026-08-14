@@ -18,6 +18,7 @@ import (
 
 	"github.com/Interesting-workstations/skill-hub/server/internal/crawler"
 	"github.com/Interesting-workstations/skill-hub/server/internal/domain"
+	"github.com/Interesting-workstations/skill-hub/server/internal/translate"
 )
 
 // ---------- 认证安全常量 ----------
@@ -61,6 +62,9 @@ type Service struct {
 	token  []byte // 进程内签名密钥（重启后旧 token 失效）
 	mu     sync.Mutex
 
+	// translator 技能标题/描述的中文翻译器（新爬取数据入库时生成 name_zh / description_zh）
+	translator *translate.Translator
+
 	blacklist     map[string]int64        // access token hash → 过期时间（主动登出）
 	refreshTokens map[string]refreshEntry // refresh token hash → 条目
 	tokenVersions map[string]int          // username → token version（改密后 +1 全失效）
@@ -79,6 +83,7 @@ func NewService(repo Repository) *Service {
 		repo:          repo,
 		client:        crawler.NewClient(os.Getenv("GITHUB_TOKEN")),
 		token:         secret,
+		translator:    translate.New(),
 		blacklist:     make(map[string]int64),
 		refreshTokens: make(map[string]refreshEntry),
 		tokenVersions: make(map[string]int),
@@ -810,12 +815,15 @@ func (s *Service) executeTask(ctx context.Context, client *crawler.Client, taskI
 	}
 	appendLog("info", fmt.Sprintf("本次抓取：官方 %d 个，社区/个人 %d 个", officialN, communityN))
 
-	// 组装待入库候选
+	// 组装待入库候选（标题/描述翻译成中文，供官网中英文切换）
+	appendLog("info", "翻译标题与描述为中文…")
 	candidates := make([]InsertSkill, 0, len(skills))
 	for _, sk := range skills {
 		candidates = append(candidates, InsertSkill{
-			ID: sk.ID, Name: sk.Name, Author: sk.Author, Description: sk.Description,
-			Category: sk.Category, DownloadURL: sk.DownloadURL, IsOfficial: sk.IsOfficial,
+			ID: sk.ID, Name: sk.Name, NameZh: s.translator.Translate(sk.Name, "zh-CN"),
+			Author: sk.Author, Description: sk.Description,
+			DescriptionZh: s.translator.Translate(sk.Description, "zh-CN"),
+			Category:      sk.Category, DownloadURL: sk.DownloadURL, IsOfficial: sk.IsOfficial,
 			GithubURL: sk.GithubURL, GithubStars: sk.GithubStars, License: sk.License,
 			SkillPath: sk.SkillPath,
 			Tags:      sk.Tags, Content: toContentSections(sk.Content),
