@@ -9,23 +9,39 @@ import PageLoading from "../../components/shared/PageLoading";
 import MarkdownContent from "../../components/shared/MarkdownContent";
 import { useI18n } from "../../i18n";
 
-// 已读文章去重：localStorage 记录访问过的文章，同一浏览器每篇只累计一次浏览量。
+// 已读文章去重：localStorage 记录「文章 → 最近一次计数日期」，与后端一致按天去重。
+// 当天重复打开/刷新不计数，跨天自动重新计数。
 const READ_KEY = "skillhub-read-articles";
-function isArticleRead(id: string): boolean {
+function todayStr(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+function isArticleReadToday(id: string): boolean {
   try {
-    const list: string[] = JSON.parse(localStorage.getItem(READ_KEY) || "[]");
-    return list.includes(id);
+    const raw = localStorage.getItem(READ_KEY);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw);
+    // 旧格式（数组）视为未读：需重新计数并迁移为对象
+    if (Array.isArray(parsed)) return false;
+    if (!parsed || typeof parsed !== "object") return false;
+    return parsed[id] === todayStr();
   } catch {
     return false;
   }
 }
-function markArticleRead(id: string): void {
+function markArticleReadToday(id: string): void {
   try {
-    const list: string[] = JSON.parse(localStorage.getItem(READ_KEY) || "[]");
-    if (!list.includes(id)) {
-      list.push(id);
-      localStorage.setItem(READ_KEY, JSON.stringify(list));
+    const raw = localStorage.getItem(READ_KEY);
+    let map: Record<string, string> = {};
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      // 兼容旧格式：数组直接迁移为空对象；对象格式则沿用
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        map = parsed;
+      }
     }
+    map[id] = todayStr();
+    localStorage.setItem(READ_KEY, JSON.stringify(map));
   } catch {
     /* 忽略存储异常 */
   }
@@ -36,9 +52,9 @@ export default function ArticleDetailPage() {
   const { data: article, loading } = useAsyncData(
     () => {
       if (!id) return Promise.reject(new Error("缺少文章 ID"));
-      const read = isArticleRead(id);
-      if (!read) markArticleRead(id);
-      // 已读过的文章不再触发浏览量累加
+      const read = isArticleReadToday(id);
+      if (!read) markArticleReadToday(id);
+      // 当天已计过的不再触发浏览量累加（跨天自动重新计数）
       return fetchArticle(id, !read);
     },
     [id]
