@@ -17,6 +17,7 @@ export default function GlobalSearch() {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
   const boxRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
   // 点击外部 / Esc 关闭
@@ -35,6 +36,20 @@ export default function GlobalSearch() {
       document.removeEventListener("keydown", onKey);
     };
   }, [open]);
+
+  // 全局 "/" 快捷键聚焦搜索框（GitHub 风格），输入框内除外
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "/") return;
+      const el = e.target as HTMLElement | null;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) return;
+      e.preventDefault();
+      inputRef.current?.focus();
+      setOpen(true);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
 
   // 防抖搜索
   useEffect(() => {
@@ -106,6 +121,7 @@ export default function GlobalSearch() {
           <path d="m20 20-3.5-3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
         </svg>
         <input
+          ref={inputRef}
           type="text"
           value={value}
           onChange={(e) => {
@@ -121,6 +137,11 @@ export default function GlobalSearch() {
           role="combobox"
         />
         {loading && <span className="global-search-spinner" aria-hidden="true" />}
+        {!open && value === "" && (
+          <kbd className="global-search-kbd" aria-hidden="true">
+            /
+          </kbd>
+        )}
       </div>
       <div
         className={`global-search-panel${showPanel ? " open" : ""}`}

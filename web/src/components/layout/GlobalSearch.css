@@ -2,21 +2,30 @@
   position: relative;
 }
 
+/* GitHub 风格搜索框：浅灰底、细边框、hover 加深、聚焦高亮并轻微展开 */
 .global-search-box {
   display: flex;
   align-items: center;
   gap: 6px;
-  width: 220px;
-  padding: 6px 10px;
+  width: 230px;
+  height: 32px;
+  padding: 0 10px;
   border: 1px solid var(--color-border-input);
   border-radius: 8px;
+  background: var(--color-surface-muted);
+  transition: width 0.2s ease, border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+
+.global-search-box:hover {
+  border-color: var(--color-text-muted);
   background: var(--color-surface);
-  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .global-search-box.focused {
+  width: 280px;
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 18%, transparent);
+  background: var(--color-surface);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 14%, transparent);
 }
 
 .global-search-icon {
@@ -35,6 +44,19 @@
 }
 
 .global-search-box input::placeholder {
+  color: var(--color-text-muted);
+}
+
+/* 快捷键提示（GitHub 风格 kbd） */
+.global-search-kbd {
+  flex-shrink: 0;
+  padding: 0 5px;
+  border: 1px solid var(--color-border-input);
+  border-radius: 4px;
+  background: var(--color-surface);
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 1.5;
   color: var(--color-text-muted);
 }
 
@@ -146,7 +168,8 @@
 }
 
 @media (max-width: 640px) {
-  .global-search-box {
+  .global-search-box,
+  .global-search-box.focused {
     width: 130px;
   }
 
