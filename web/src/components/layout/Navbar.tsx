@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { buttonHoverEnter, buttonHoverLeave, buttonClick } from "../../animations";
 import { useI18n, type Lang } from "../../i18n";
+import GlobalSearch from "./GlobalSearch";
 import "./Navbar.css";
 
 export default function Navbar() {
@@ -55,6 +56,7 @@ export default function Navbar() {
         </Link>
 
         <div className="navbar-actions">
+          <GlobalSearch />
           <div className="lang-switch" ref={langBtnRef}>
             <button
               className="btn-lang"

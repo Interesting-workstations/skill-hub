@@ -13,7 +13,11 @@
     "official": "Official",
     "featured": "Featured",
     "categories": "Categories",
-    "submitSkill": "Submit a Skill"
+    "submitSkill": "Submit a Skill",
+    "search": "Search skills",
+    "searchPlaceholder": "Search skills, authors, tags…",
+    "searchNoResult": "No matching skills found",
+    "searchLoading": "Searching…"
   },
   "footer": {
     "browse": "Browse",

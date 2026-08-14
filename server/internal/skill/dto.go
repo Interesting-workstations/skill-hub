@@ -8,6 +8,7 @@ type SkillFilter struct {
 	Author   string
 	Official bool
 	Featured bool
+	Query    string
 }
 
 // AuthorDetail 作者及其技能（作者详情响应）。

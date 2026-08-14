@@ -27,15 +27,17 @@ func NewService(repo Repository) *Service {
 }
 
 // ListSkills 按筛选条件返回技能列表。
-// filter 为空字段表示不筛选；featured 筛选由精选规则生成。
+// filter 为空字段表示不筛选；featured 筛选由精选规则生成；
+// Query 为关键词，匹配名称/作者/描述/标签/分类（不区分大小写）。
 func (s *Service) ListSkills(filter SkillFilter) []domain.Skill {
 	if filter.Featured {
 		return s.filteredFeatured(filter)
 	}
 	all := s.repo.AllSkills()
-	if filter.Category == "" && filter.Author == "" && !filter.Official {
+	if filter.Category == "" && filter.Author == "" && !filter.Official && filter.Query == "" {
 		return all
 	}
+	q := strings.ToLower(strings.TrimSpace(filter.Query))
 	out := make([]domain.Skill, 0, len(all))
 	for _, sk := range all {
 		if filter.Category != "" && sk.Category != filter.Category {
@@ -47,17 +49,43 @@ func (s *Service) ListSkills(filter SkillFilter) []domain.Skill {
 		if filter.Official && !sk.IsOfficial {
 			continue
 		}
+		if q != "" && !skillMatches(sk, q) {
+			continue
+		}
 		out = append(out, sk)
 	}
 	return out
 }
 
+// skillMatches 判断技能是否匹配搜索关键词（名称/作者/描述/标签/分类，不区分大小写）。
+func skillMatches(sk domain.Skill, q string) bool {
+	if strings.Contains(strings.ToLower(sk.Name), q) {
+		return true
+	}
+	if strings.Contains(strings.ToLower(sk.Author), q) {
+		return true
+	}
+	if strings.Contains(strings.ToLower(sk.Description), q) {
+		return true
+	}
+	if strings.Contains(strings.ToLower(sk.Category), q) {
+		return true
+	}
+	for _, tag := range sk.Tags {
+		if strings.Contains(strings.ToLower(tag), q) {
+			return true
+		}
+	}
+	return false
+}
+
 // filteredFeatured 在精选规则结果之上应用其余筛选。
 func (s *Service) filteredFeatured(filter SkillFilter) []domain.Skill {
 	featured := s.FeaturedSkills(DefaultFeaturedLimit)
-	if filter.Category == "" && filter.Author == "" && !filter.Official {
+	if filter.Category == "" && filter.Author == "" && !filter.Official && filter.Query == "" {
 		return featured
 	}
+	q := strings.ToLower(strings.TrimSpace(filter.Query))
 	out := make([]domain.Skill, 0, len(featured))
 	for _, sk := range featured {
 		if filter.Category != "" && sk.Category != filter.Category {
@@ -67,6 +95,9 @@ func (s *Service) filteredFeatured(filter SkillFilter) []domain.Skill {
 			continue
 		}
 		if filter.Official && !sk.IsOfficial {
+			continue
+		}
+		if q != "" && !skillMatches(sk, q) {
 			continue
 		}
 		out = append(out, sk)

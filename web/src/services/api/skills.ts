@@ -7,6 +7,8 @@ export interface SkillQuery {
   author?: string;
   official?: boolean;
   featured?: boolean;
+  /** 关键词搜索：匹配名称/作者/描述/标签/分类 */
+  q?: string;
 }
 
 /** GET /api/v1/skills */
@@ -16,6 +18,7 @@ export function fetchSkills(query: SkillQuery = {}): Promise<Skill[]> {
   if (query.author) qs.set("author", query.author);
   if (query.official) qs.set("official", "true");
   if (query.featured) qs.set("featured", "true");
+  if (query.q) qs.set("q", query.q);
   const q = qs.toString();
   return request<Skill[]>(`/skills${q ? `?${q}` : ""}`);
 }

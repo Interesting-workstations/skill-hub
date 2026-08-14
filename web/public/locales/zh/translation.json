@@ -13,7 +13,11 @@
     "official": "官方技能",
     "featured": "精选技能",
     "categories": "全部分类",
-    "submitSkill": "提交技能"
+    "submitSkill": "提交技能",
+    "search": "搜索技能",
+    "searchPlaceholder": "搜索技能、作者、标签…",
+    "searchNoResult": "未找到匹配的技能",
+    "searchLoading": "搜索中…"
   },
   "footer": {
     "browse": "浏览",
