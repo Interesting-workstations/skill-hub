@@ -1,5 +1,6 @@
 import { useSearchParams, Link } from "react-router-dom";
 import SkillCard from "../../components/skill/SkillCard";
+import OrgAvatar from "../../components/shared/OrgAvatar";
 import { sectionEnter } from "../../animations";
 import { usePageAnimation } from "../../hooks/usePageAnimation";
 import { usePageMeta } from "../../hooks/usePageMeta";
@@ -45,9 +46,18 @@ export default function OfficialPage() {
         ]}
       />
 
-      <h1 style={{ fontSize: 28, fontWeight: 800, color: "var(--color-text)", margin: "0 0 8px" }}>
-        {currentOrg ? `${currentOrg.avatar} ${currentOrg.displayName}` : t("officialPage.title")}
-      </h1>
+      {currentOrg ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 14, margin: "0 0 8px" }}>
+          <OrgAvatar src={currentOrg.logoUrl} fallback={currentOrg.avatar} size={44} />
+          <h1 style={{ fontSize: 28, fontWeight: 800, color: "var(--color-text)", margin: 0 }}>
+            {currentOrg.displayName}
+          </h1>
+        </div>
+      ) : (
+        <h1 style={{ fontSize: 28, fontWeight: 800, color: "var(--color-text)", margin: "0 0 8px" }}>
+          {t("officialPage.title")}
+        </h1>
+      )}
       <p style={{ fontSize: 15, color: "var(--color-text-secondary)", margin: "0 0 20px" }}>
         {currentOrg
           ? t("officialPage.orgDesc", { name: currentOrg.displayName, n: skills?.length ?? 0 })

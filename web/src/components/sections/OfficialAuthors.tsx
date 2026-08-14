@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import type { OfficialOrgSummary } from "../../data/types";
 import { cardHoverEnter, cardHoverLeave } from "../../animations";
 import { useI18n } from "../../i18n";
+import OrgAvatar from "../shared/OrgAvatar";
 import "./OfficialAuthors.css";
 
 interface Props {
@@ -41,7 +42,12 @@ export default function OfficialAuthors({ orgs }: Props) {
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
           >
-            <span className="author-avatar">{org.avatar}</span>
+            <OrgAvatar
+              src={org.logoUrl}
+              fallback={org.avatar}
+              size={44}
+              className="author-avatar"
+            />
             <div className="author-info">
               <h3 className="author-name">{org.displayName}</h3>
               <p className="author-count">{t("official.skillCount", { n: org.officialCount })}</p>

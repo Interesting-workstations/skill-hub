@@ -217,3 +217,14 @@ export interface OfficialOrg {
   enabled: boolean;
   createdAt: string;
 }
+
+/* GitHub 校验结果：owner 是否为真正的组织 + 头像是否有效 */
+export interface OrgVerifyResult {
+  owner: string;
+  displayName: string;
+  /** Organization=正确组织 / User=个人账号 / NotFound=不存在 / Error=校验失败 */
+  githubType: string;
+  /** 组织头像是否有效（非默认 identicon / 纯色块） */
+  avatarOk: boolean;
+  logoUrl: string;
+}

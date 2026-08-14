@@ -5,6 +5,7 @@ import { usePageMeta } from "../../hooks/usePageMeta";
 import PageContainer from "../../components/shared/PageContainer";
 import Breadcrumb from "../../components/shared/Breadcrumb";
 import PageLoading from "../../components/shared/PageLoading";
+import OrgAvatar from "../../components/shared/OrgAvatar";
 import { useI18n } from "../../i18n";
 import "./OrgsPage.css";
 
@@ -47,7 +48,12 @@ export default function OrgsPage() {
             to={`/official?org=${encodeURIComponent(org.owner)}`}
             className={`org-card${org.officialCount > 0 ? " has-skills" : ""}`}
           >
-            <span className="org-card-avatar">{org.avatar}</span>
+            <OrgAvatar
+              src={org.logoUrl}
+              fallback={org.avatar}
+              size={40}
+              className="org-card-avatar"
+            />
             <div className="org-card-info">
               <h3 className="org-card-name">{org.displayName}</h3>
               <p className="org-card-count">

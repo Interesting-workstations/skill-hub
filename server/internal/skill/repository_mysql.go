@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
 
@@ -345,9 +346,10 @@ func (r *mysqlRepo) AllCategories() []domain.Category {
 
 // OfficialOrgSummaries 返回官方组织概览：启用中的官方组织及其官方技能数。
 // 官方组织表（official_orgs）为唯一数据源，按展示名去重（如 anthropics/anthropic 归并为 Anthropic）。
+// logo 地址：显式存储的 logo_url 优先（后台可锁定），为空时回退动态生成。
 func (r *mysqlRepo) OfficialOrgSummaries() []domain.OfficialOrgSummary {
 	rows, err := r.db.Query(`
-		SELECT MIN(o.owner), o.display_name, MIN(o.avatar),
+		SELECT MIN(o.owner), o.display_name, MIN(o.avatar), MIN(o.logo_url),
 			COALESCE(agg.official_count, 0)
 		FROM official_orgs o
 		LEFT JOIN (
@@ -366,8 +368,19 @@ func (r *mysqlRepo) OfficialOrgSummaries() []domain.OfficialOrgSummary {
 	out := make([]domain.OfficialOrgSummary, 0, 24)
 	for rows.Next() {
 		var o domain.OfficialOrgSummary
-		if err := rows.Scan(&o.Owner, &o.DisplayName, &o.Avatar, &o.OfficialCount); err != nil {
+		if err := rows.Scan(&o.Owner, &o.DisplayName, &o.Avatar, &o.LogoURL, &o.OfficialCount); err != nil {
 			continue
+		}
+		// 未显式锁定 logo 时，回退动态生成（走后端代理 /org-logo）
+		if o.LogoURL == "" {
+			o.LogoURL = "/org-logo/" + o.Owner
+		} else if strings.HasPrefix(o.LogoURL, "https://github.com/") {
+			// 显式锁定的 GitHub 头像转代理路径（绕防盗链，且支持修正后的组织名）
+			name := strings.TrimSuffix(strings.TrimPrefix(o.LogoURL, "https://github.com/"), ".png")
+			o.LogoURL = "/org-logo/" + name
+		} else {
+			// 官网等其他来源的 logo 走通用图片代理（绕 Cloudflare / 防盗链）
+			o.LogoURL = "/img-proxy?url=" + url.QueryEscape(o.LogoURL)
 		}
 		out = append(out, o)
 	}
@@ -375,9 +388,8 @@ func (r *mysqlRepo) OfficialOrgSummaries() []domain.OfficialOrgSummary {
 }
 
 func (r *mysqlRepo) skillsByCategory(slug string) []domain.Skill {
-	rows, err := r.db.Query(`SELECT id, name, author, description, category,
-		download_url, is_official, is_featured, install_command, github_url,
-		github_stars, license, skill_path, tags, content FROM skills WHERE category = ?`, slug)
+	rows, err := r.db.Query(`SELECT id, name, author, description, category, download_url, is_official, is_featured,
+		install_command, github_url, github_stars, license, skill_path, tags, content FROM skills WHERE category = ?`, slug)
 	if err != nil {
 		return nil
 	}

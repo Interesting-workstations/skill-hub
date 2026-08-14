@@ -529,6 +529,7 @@ func (s *Service) UpdateOfficialOrg(owner string, patch domain.OfficialOrg) erro
 	if patch.Avatar != "" {
 		fields["avatar"] = patch.Avatar
 	}
+	fields["logo_url"] = patch.LogoURL
 	fields["sort_order"] = patch.SortOrder
 	fields["enabled"] = 0
 	if patch.Enabled {
@@ -539,6 +540,52 @@ func (s *Service) UpdateOfficialOrg(owner string, patch domain.OfficialOrg) erro
 
 func (s *Service) DeleteOfficialOrg(owner string) error {
 	return s.repo.DeleteOfficialOrg(owner)
+}
+
+// VerifyOfficialOrgs 用 GitHub API 校验所有官方组织的 owner 类型与头像有效性，
+// 找出个人账号（type=User）、不存在（NotFound）或头像无效（默认 identicon）的条目。
+// 并发校验（限流）以缩短耗时：70+ 组织串行需 30s+，并发 8 约 4s。
+func (s *Service) VerifyOfficialOrgs() []domain.OrgVerifyResult {
+	orgs, err := s.repo.ListOfficialOrgs()
+	if err != nil {
+		return nil
+	}
+	out := make([]domain.OrgVerifyResult, len(orgs))
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, 8)
+	for i, o := range orgs {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(idx int, o domain.OfficialOrg) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			gt := "Error"
+			avatarOK := false
+			if chk, err := s.client.CheckOrg(o.Owner); err == nil {
+				gt = chk.Type
+				avatarOK = chk.AvatarOK
+			}
+			// 已显式使用官网 logo（非 GitHub 头像）的组织，GitHub 头像无效不再视为问题
+			if usesOfficialLogo(o.LogoURL) {
+				avatarOK = true
+			}
+			out[idx] = domain.OrgVerifyResult{
+				Owner:       o.Owner,
+				DisplayName: o.DisplayName,
+				GitHubType:  gt,
+				AvatarOK:    avatarOK,
+				LogoURL:     o.LogoURL,
+			}
+		}(i, o)
+	}
+	wg.Wait()
+	return out
+}
+
+// usesOfficialLogo 判断组织是否已显式使用官网 logo（非 GitHub 头像）。
+// 这类组织的 GitHub 头像即使无效（默认 identicon）也不再需要关注。
+func usesOfficialLogo(logoURL string) bool {
+	return logoURL != "" && !strings.HasPrefix(logoURL, "https://github.com/")
 }
 
 // RunTask 启动一次真实爬虫执行（后台 goroutine，前端轮询执行记录）。

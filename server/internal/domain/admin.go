@@ -213,6 +213,7 @@ type OfficialOrg struct {
 	Owner       string `json:"owner"`
 	DisplayName string `json:"displayName"`
 	Avatar      string `json:"avatar"`
+	LogoURL     string `json:"logoUrl"`
 	SortOrder   int    `json:"sortOrder"`
 	Enabled     bool   `json:"enabled"`
 	CreatedAt   string `json:"createdAt"`
@@ -224,5 +225,18 @@ type OfficialOrgSummary struct {
 	Owner         string `json:"owner"`
 	DisplayName   string `json:"displayName"`
 	Avatar        string `json:"avatar"`
+	LogoURL       string `json:"logoUrl"`
 	OfficialCount int    `json:"officialCount"`
+}
+
+// OrgVerifyResult 官方组织 GitHub 校验结果（后台一键校验）。
+// GitHubType：Organization=正确组织 / User=个人账号（应修正或删除） / NotFound=不存在 / Error=校验失败。
+// AvatarOK：Organization 且头像有效（非默认 identicon / 纯色块）时为 true；
+// 头像无效说明该组织未设置品牌 logo，建议在后台 Logo URL 填写官网 logo。
+type OrgVerifyResult struct {
+	Owner       string `json:"owner"`
+	DisplayName string `json:"displayName"`
+	GitHubType  string `json:"githubType"`
+	AvatarOK    bool   `json:"avatarOk"`
+	LogoURL     string `json:"logoUrl"`
 }

@@ -167,6 +167,10 @@ func NewMySQLRepository(dsn string) (Repository, error) {
 		db.Close()
 		return nil, err
 	}
+	if err := repo.migrateOfficialOrgLogos(); err != nil {
+		db.Close()
+		return nil, err
+	}
 	return repo, nil
 }
 
@@ -285,6 +289,7 @@ func (r *mysqlRepo) migrate() error {
 			owner VARCHAR(100) PRIMARY KEY,
 			display_name VARCHAR(100) NOT NULL DEFAULT '',
 			avatar VARCHAR(32) NOT NULL DEFAULT '',
+			logo_url VARCHAR(255) NOT NULL DEFAULT '',
 			sort_order INT NOT NULL DEFAULT 0,
 			enabled TINYINT(1) NOT NULL DEFAULT 1,
 			created_at VARCHAR(16) NOT NULL DEFAULT ''
@@ -304,7 +309,21 @@ func (r *mysqlRepo) migrate() error {
 	if err := r.ensureSkillPathColumn(); err != nil {
 		return err
 	}
+	if err := r.ensureLogoURLColumn(); err != nil {
+		return err
+	}
 	return r.ensureArticleContentColumn()
+}
+
+// ensureLogoURLColumn 给已存在的 official_orgs 表补充 logo_url（logo 图片）列。
+func (r *mysqlRepo) ensureLogoURLColumn() error {
+	if _, err := r.db.Exec(`ALTER TABLE official_orgs ADD COLUMN logo_url VARCHAR(255) NOT NULL DEFAULT ''`); err != nil {
+		if strings.Contains(err.Error(), "Duplicate column") {
+			return nil
+		}
+		return err
+	}
+	return nil
 }
 
 // ensureArticleContentColumn 给已存在的 articles 表补充 content（正文）列。
@@ -1140,6 +1159,49 @@ func (r *mysqlRepo) update(table, id string, fields map[string]any) error {
 // ---------- 官方组织（动态管理） ----------
 
 // seedOfficialOrgs 表为空时预置默认官方组织列表（含大量知名组织）。
+// officialLogoOwner 官方组织 owner → 正确的 GitHub 组织名（用于 logo 头像 URL）。
+// 部分 owner 是别名/占位，GitHub 上对应的是错误账号（如 anthropic 是个人用户），需修正。
+var officialLogoOwner = map[string]string{
+	"anthropic":  "anthropics",
+	"cohere":     "cohere-ai",
+	"pinecone":   "pinecone-io",
+	"snowflake":  "snowflakedb",
+	"scaleai":    "scaleapi",
+	"amazon":     "aws",
+	"confluent":  "confluentinc",
+	"redhat":     "redhat-developer",
+	"samba-nova": "sambanova",
+	"slack":      "slackhq",
+	"xai":        "xai-org",
+	"meta":       "facebook",
+}
+
+// officialLogoURL 返回组织 logo 的 GitHub 头像地址（使用修正后的正确组织名）。
+func officialLogoURL(owner string) string {
+	gh := officialLogoOwner[owner]
+	if gh == "" {
+		gh = owner
+	}
+	return fmt.Sprintf("https://github.com/%s.png", gh)
+}
+
+// officialLogoOverride 无有效 GitHub 头像的组织 → 使用官网品牌 logo（经 /img-proxy 白名单代理）。
+// 这些组织的 GitHub 组织未设置头像（默认 identicon / 纯色块），必须用官网 logo 才能显示正确。
+var officialLogoOverride = map[string]string{
+	"sst":           "https://sst.dev/favicon.svg",
+	"perplexity-ai": "https://www.perplexity.ai/favicon.svg",
+	"zhipuai":       "https://www.zhipuai.cn/favicon.png",
+	"nomic-ai":      "https://www.nomic.ai/favicon-512x512.png",
+}
+
+// officialLogo 计算组织 logo 地址：官网覆盖优先，否则 GitHub 头像。
+func officialLogo(owner string) string {
+	if ov, ok := officialLogoOverride[owner]; ok {
+		return ov
+	}
+	return officialLogoURL(owner)
+}
+
 func (r *mysqlRepo) seedOfficialOrgs() error {
 	var n int
 	if err := r.db.QueryRow(`SELECT COUNT(*) FROM official_orgs`).Scan(&n); err != nil {
@@ -1162,10 +1224,9 @@ func (r *mysqlRepo) seedOfficialOrgs() error {
 		{"figma", "Figma", "🎨", 8},
 		{"notion", "Notion", "📝", 9},
 		{"stripe", "Stripe", "💳", 10},
-		{"aws", "AWS", "☁️", 11},
+		{"aws", "Amazon", "☁️", 11},
 		{"aws-samples", "AWS", "☁️", 11},
 		{"sst", "SST", "▲", 12},
-		{"meta", "Meta", "🔵", 13},
 		{"facebook", "Meta", "🔵", 13},
 		{"huggingface", "Hugging Face", "🤗", 14},
 		{"ibm", "IBM", "🔷", 15},
@@ -1173,22 +1234,21 @@ func (r *mysqlRepo) seedOfficialOrgs() error {
 		{"apple", "Apple", "🍎", 17},
 		{"netflix", "Netflix", "🎬", 18},
 		{"linkedin", "LinkedIn", "💼", 19},
-		{"amazon", "Amazon", "🛒", 20},
 		{"alibaba", "Alibaba", "🅰️", 21},
 		{"tencent", "Tencent", "🐧", 22},
 		{"baidu", "Baidu", "🐻", 23},
-		{"xai", "xAI", "🐦", 24},
+		{"xai-org", "xAI", "🐦", 24},
 		{"mistralai", "Mistral AI", "🌀", 25},
-		{"cohere", "Cohere", "🌊", 26},
+		{"cohere-ai", "Cohere", "🌊", 26},
 		{"databricks", "Databricks", "🔥", 27},
-		{"snowflake", "Snowflake", "❄️", 28},
+		{"snowflakedb", "Snowflake", "❄️", 28},
 		{"nvidia", "NVIDIA", "🟢", 29},
 		{"intel", "Intel", "🔵", 30},
 		{"amd", "AMD", "🔴", 31},
 		{"samsung", "Samsung", "🔷", 32},
 		{"bytedance", "ByteDance", "🎵", 33},
 		{"tiktok", "TikTok", "🎵", 33},
-		{"redhat", "Red Hat", "🧢", 34},
+		{"redhat-developer", "Red Hat", "🧢", 34},
 		{"docker", "Docker", "🐳", 35},
 		{"vmware", "VMware", "🟠", 36},
 		{"salesforce", "Salesforce", "☁️", 37},
@@ -1198,7 +1258,7 @@ func (r *mysqlRepo) seedOfficialOrgs() error {
 		{"spotify", "Spotify", "🎧", 41},
 		{"airbnb", "Airbnb", "🏠", 42},
 		{"dropbox", "Dropbox", "📦", 43},
-		{"slack", "Slack", "💬", 44},
+		{"slackhq", "Slack", "💬", 44},
 		{"zoom", "Zoom", "📹", 45},
 		{"atlassian", "Atlassian", "🧩", 46},
 		{"gitlab", "GitLab", "🦊", 47},
@@ -1208,8 +1268,8 @@ func (r *mysqlRepo) seedOfficialOrgs() error {
 		{"neo4j", "Neo4j", "🟢", 51},
 		{"elastic", "Elastic", "🟡", 52},
 		{"datadog", "Datadog", "🐕", 53},
-		{"confluent", "Confluent", "🌊", 54},
-		{"pinecone", "Pinecone", "🌲", 55},
+		{"confluentinc", "Confluent", "🌊", 54},
+		{"pinecone-io", "Pinecone", "🌲", 55},
 		{"replicate", "Replicate", "🌀", 56},
 		{"langchain-ai", "LangChain", "🦜", 57},
 		{"wandb", "Weights & Biases", "📈", 58},
@@ -1221,18 +1281,18 @@ func (r *mysqlRepo) seedOfficialOrgs() error {
 		{"moonshotai", "Moonshot AI", "🌙", 64},
 		{"ai21labs", "AI21", "🌈", 65},
 		{"tiiuae", "TII", "🕌", 66},
-		{"scaleai", "Scale AI", "📐", 67},
+		{"scaleapi", "Scale AI", "📐", 67},
 		{"run-ai", "Run.ai", "🏃", 68},
-		{"samba-nova", "SambaNova", "🦙", 69},
+		{"sambanova", "SambaNova", "🦙", 69},
 		{"cerebras", "Cerebras", "🧠", 70},
 		{"groq", "Groq", "⚡", 71},
 		{"nomic-ai", "Nomic", "🧭", 72},
-		{"anthropic", "Anthropic", "🅰️", 1},
 	}
 	for _, o := range orgs {
+		owner := o[0].(string)
 		if _, err := r.db.Exec(
-			`INSERT INTO official_orgs(owner, display_name, avatar, sort_order, enabled, created_at) VALUES(?,?,?,?,1,?)`,
-			o[0], o[1], o[2], o[3], today(),
+			`INSERT INTO official_orgs(owner, display_name, avatar, sort_order, enabled, logo_url, created_at) VALUES(?,?,?,?,1,?,?)`,
+			o[0], o[1], o[2], o[3], officialLogo(owner), today(),
 		); err != nil {
 			return err
 		}
@@ -1240,8 +1300,33 @@ func (r *mysqlRepo) seedOfficialOrgs() error {
 	return nil
 }
 
+// migrateOfficialOrgLogos 为已有官方组织补充 logo_url（用修正后的正确 GitHub 组织名）。
+func (r *mysqlRepo) migrateOfficialOrgLogos() error {
+	rows, err := r.db.Query(`SELECT owner, logo_url FROM official_orgs`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	var pending []string
+	for rows.Next() {
+		var owner, logo string
+		if err := rows.Scan(&owner, &logo); err != nil {
+			continue
+		}
+		if logo == "" {
+			pending = append(pending, owner)
+		}
+	}
+	for _, owner := range pending {
+		if _, err := r.db.Exec(`UPDATE official_orgs SET logo_url = ? WHERE owner = ?`, officialLogo(owner), owner); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (r *mysqlRepo) ListOfficialOrgs() ([]domain.OfficialOrg, error) {
-	rows, err := r.db.Query(`SELECT owner, display_name, avatar, sort_order, enabled, created_at
+	rows, err := r.db.Query(`SELECT owner, display_name, avatar, logo_url, sort_order, enabled, created_at
 		FROM official_orgs ORDER BY sort_order, owner`)
 	if err != nil {
 		return nil, err
@@ -1251,7 +1336,7 @@ func (r *mysqlRepo) ListOfficialOrgs() ([]domain.OfficialOrg, error) {
 	for rows.Next() {
 		var o domain.OfficialOrg
 		var enabled int
-		if err := rows.Scan(&o.Owner, &o.DisplayName, &o.Avatar, &o.SortOrder, &enabled, &o.CreatedAt); err != nil {
+		if err := rows.Scan(&o.Owner, &o.DisplayName, &o.Avatar, &o.LogoURL, &o.SortOrder, &enabled, &o.CreatedAt); err != nil {
 			return nil, err
 		}
 		o.Enabled = enabled == 1
@@ -1268,9 +1353,12 @@ func (r *mysqlRepo) CreateOfficialOrg(o *domain.OfficialOrg) error {
 	if o.CreatedAt == "" {
 		o.CreatedAt = today()
 	}
+	if o.LogoURL == "" {
+		o.LogoURL = officialLogoURL(o.Owner)
+	}
 	_, err := r.db.Exec(
-		`INSERT INTO official_orgs(owner, display_name, avatar, sort_order, enabled, created_at) VALUES(?,?,?,?,?,?)`,
-		o.Owner, o.DisplayName, o.Avatar, o.SortOrder, enabled, o.CreatedAt)
+		`INSERT INTO official_orgs(owner, display_name, avatar, logo_url, sort_order, enabled, created_at) VALUES(?,?,?,?,?,?,?)`,
+		o.Owner, o.DisplayName, o.Avatar, o.LogoURL, o.SortOrder, enabled, o.CreatedAt)
 	return err
 }
 

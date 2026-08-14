@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -12,6 +13,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Interesting-workstations/skill-hub/server/internal/crawler"
 	"github.com/Interesting-workstations/skill-hub/server/internal/domain"
@@ -41,6 +43,10 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/categories/{slug}", h.getCategory)
 	// 官方组织概览（官方技能 / 官方组织统一数据源）
 	mux.HandleFunc("GET /api/v1/official-orgs", h.listOfficialOrgs)
+	// 官方组织 logo 图片代理（绕开浏览器访问 GitHub 的防盗链）
+	mux.HandleFunc("GET /api/v1/org-logo/{owner}", h.orgLogo)
+	// 官方组织 logo 通用代理（白名单域名，支持官网 SVG 等非 GitHub 来源，绕 Cloudflare）
+	mux.HandleFunc("GET /api/v1/img-proxy", h.imgProxy)
 	// 公开内容：文章 / 站点配置 / SEO（admin 管理，官网读取）
 	mux.HandleFunc("GET /api/v1/articles", h.listArticles)
 	mux.HandleFunc("GET /api/v1/articles/{id}", h.getArticle)
@@ -272,6 +278,103 @@ func (h *Handler) getCategory(w http.ResponseWriter, r *http.Request) {
 // GET /api/v1/official-orgs —— 官方组织概览（含各组织官方技能数）。
 func (h *Handler) listOfficialOrgs(w http.ResponseWriter, _ *http.Request) {
 	response.OK(w, h.svc.ListOfficialOrgs())
+}
+
+// GET /api/v1/org-logo/{owner} —— 官方组织 logo 图片代理。
+// 浏览器直接加载 github.com/{owner}.png 会因防盗链（带外部 Referer 返回 406）失败，
+// 改由后端无 Referer 拉取并转发，同时提供缓存。
+func (h *Handler) orgLogo(w http.ResponseWriter, r *http.Request) {
+	owner := r.PathValue("owner")
+	if owner == "" {
+		response.NotFound(w, "组织不存在")
+		return
+	}
+	resp, err := http.Get("https://github.com/" + url.PathEscape(owner) + ".png")
+	if err != nil {
+		response.NotFound(w, "logo 获取失败")
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		response.NotFound(w, "logo 不存在")
+		return
+	}
+	if ct := resp.Header.Get("Content-Type"); ct != "" {
+		w.Header().Set("Content-Type", ct)
+	}
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+	if _, err := io.Copy(w, resp.Body); err != nil {
+		return
+	}
+}
+
+// logoProxyAllowedHosts 官方组织 logo 代理白名单（防 SSRF，仅代理知名品牌来源）。
+var logoProxyAllowedHosts = []string{
+	"sst.dev",
+	"perplexity.ai",
+	"zhipuai.cn",
+	"www.zhipuai.cn",
+	"bigmodel.cn",
+	"nomic.ai",
+	"www.nomic.ai",
+	"avatars.githubusercontent.com",
+	"github.com",
+	"upload.wikimedia.org",
+}
+
+// logoProxyAllowed 判断 host 是否在白名单（含子域名）。
+func logoProxyAllowed(host string) bool {
+	h := strings.ToLower(strings.TrimSpace(host))
+	for _, a := range logoProxyAllowedHosts {
+		if h == a || strings.HasSuffix(h, "."+a) {
+			return true
+		}
+	}
+	return false
+}
+
+// GET /api/v1/img-proxy?url=... —— 通用图片代理（白名单域名）。
+// 部分官网（如 Perplexity 的 Cloudflare 返回 NotSameOrigin 头）会拦截浏览器直接加载图片，
+// 改由后端无 Referer 拉取并转发，同时提供缓存。
+func (h *Handler) imgProxy(w http.ResponseWriter, r *http.Request) {
+	raw := r.URL.Query().Get("url")
+	if raw == "" {
+		response.InvalidParam(w, "缺少 url 参数")
+		return
+	}
+	u, err := url.Parse(raw)
+	if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
+		response.InvalidParam(w, "url 不合法")
+		return
+	}
+	if !logoProxyAllowed(u.Host) {
+		response.NotFound(w, "logo 不存在")
+		return
+	}
+	client := &http.Client{Timeout: 15 * time.Second}
+	req, err := http.NewRequest(http.MethodGet, raw, nil)
+	if err != nil {
+		response.NotFound(w, "logo 获取失败")
+		return
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36")
+	resp, err := client.Do(req)
+	if err != nil {
+		response.NotFound(w, "logo 获取失败")
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		response.NotFound(w, "logo 不存在")
+		return
+	}
+	if ct := resp.Header.Get("Content-Type"); ct != "" {
+		w.Header().Set("Content-Type", ct)
+	}
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+	if _, err := io.Copy(w, resp.Body); err != nil {
+		return
+	}
 }
 
 // POST /api/v1/skills/submit —— 用户提交技能（进入待审核）。

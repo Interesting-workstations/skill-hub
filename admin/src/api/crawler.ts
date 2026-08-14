@@ -1,7 +1,7 @@
 /** 爬虫管理 API —— 对接 skill-hub 后端（/api/v1/admin），数据全部由 Go 提供。 */
 
 import { http } from "../core/http";
-import type { AdminStats, CrawlTask, CrawlerConfig, ExecutionRecord, FailureRecord, OfficialOrg } from "../types";
+import type { AdminStats, CrawlTask, CrawlerConfig, ExecutionRecord, FailureRecord, OfficialOrg, OrgVerifyResult } from "../types";
 
 const base = "/api/v1/admin";
 
@@ -42,18 +42,23 @@ export const crawlerApi = {
   },
 
   /** 新增官方组织 */
-  createOfficialOrg(input: Pick<OfficialOrg, "owner" | "displayName" | "avatar" | "sortOrder" | "enabled">): Promise<OfficialOrg> {
+  createOfficialOrg(input: Pick<OfficialOrg, "owner" | "displayName" | "avatar" | "logoUrl" | "sortOrder" | "enabled">): Promise<OfficialOrg> {
     return http.post<OfficialOrg>(`${base}/official-orgs`, input);
   },
 
   /** 更新官方组织 */
-  updateOfficialOrg(owner: string, patch: Pick<OfficialOrg, "displayName" | "avatar" | "sortOrder" | "enabled">): Promise<void> {
+  updateOfficialOrg(owner: string, patch: Pick<OfficialOrg, "displayName" | "avatar" | "logoUrl" | "sortOrder" | "enabled">): Promise<void> {
     return http.put<void>(`${base}/official-orgs/${encodeURIComponent(owner)}`, patch);
   },
 
   /** 删除官方组织 */
   deleteOfficialOrg(owner: string): Promise<void> {
     return http.delete<void>(`${base}/official-orgs/${encodeURIComponent(owner)}`);
+  },
+
+  /** 一键校验所有官方组织的 GitHub 类型与头像有效性 */
+  verifyOfficialOrgs(): Promise<OrgVerifyResult[]> {
+    return http.get<OrgVerifyResult[]>(`${base}/official-orgs/verify`);
   },
 
   /** 停止任务 */

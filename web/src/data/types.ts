@@ -47,6 +47,7 @@ export interface OfficialOrgSummary {
   owner: string;
   displayName: string;
   avatar: string;
+  logoUrl?: string;
   officialCount: number;
 }
 

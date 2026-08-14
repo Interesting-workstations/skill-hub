@@ -1,9 +1,14 @@
 package crawler
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"image"
+	_ "image/jpeg" // 注册 JPEG 解码器（供头像颜色分析）
+	_ "image/png"  // 注册 PNG 解码器
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -109,6 +114,123 @@ func (c *Client) get(path string, out any) error {
 		return fmt.Errorf("GitHub API %s: %s", path, resp.Status)
 	}
 	return json.NewDecoder(resp.Body).Decode(out)
+}
+
+// GetUserType 查询 GitHub 用户/组织类型（Organization / User / NotFound）。
+// 用于官方组织校验：owner 必须是真正的 GitHub 组织（type=Organization），
+// 否则爬虫会把个人账号的仓库误标为官方，logo 也会显示个人头像。
+func (c *Client) GetUserType(owner string) (string, error) {
+	var u struct {
+		Type string `json:"type"`
+	}
+	if err := c.get("/users/"+url.PathEscape(owner), &u); err != nil {
+		if strings.Contains(err.Error(), "404") {
+			return "NotFound", nil
+		}
+		return "", err
+	}
+	if u.Type == "" {
+		return "NotFound", nil
+	}
+	return u.Type, nil
+}
+
+// OrgCheck GitHub 组织校验信息（类型 + 头像是否有效）。
+type OrgCheck struct {
+	Type     string // Organization / User / NotFound
+	Avatar   string // GitHub 头像 URL
+	AvatarOK bool   // 头像是否为有效品牌 logo（非默认 identicon / 纯色块）
+}
+
+// CheckOrg 校验 owner 是否为真正的 GitHub 组织，并检测头像是否有效。
+// 部分组织虽 type=Organization 但从未设置头像（GitHub 默认 identicon 或纯色块），
+// 显示出来是乱码几何图，需要提示管理员改用官网 logo。
+func (c *Client) CheckOrg(owner string) (OrgCheck, error) {
+	var u struct {
+		Type   string `json:"type"`
+		Avatar string `json:"avatar_url"`
+	}
+	if err := c.get("/users/"+url.PathEscape(owner), &u); err != nil {
+		if strings.Contains(err.Error(), "404") {
+			return OrgCheck{Type: "NotFound"}, nil
+		}
+		return OrgCheck{}, err
+	}
+	if u.Type == "" {
+		return OrgCheck{Type: "NotFound"}, nil
+	}
+	if u.Type != "Organization" {
+		return OrgCheck{Type: u.Type, Avatar: u.Avatar}, nil
+	}
+	return OrgCheck{Type: u.Type, Avatar: u.Avatar, AvatarOK: c.avatarLooksReal(u.Avatar)}, nil
+}
+
+// avatarLooksReal 下载头像（64px）并判断是否有效品牌 logo。
+// 启发式：GitHub 默认 identicon / 纯色块的颜色极少，有效 logo 通常色彩丰富。
+// 只要主要色占比 < 92% 即视为有效（避免误杀单色但清晰的 logo）。
+func (c *Client) avatarLooksReal(avatarURL string) bool {
+	if avatarURL == "" {
+		return false
+	}
+	u, err := url.Parse(avatarURL)
+	if err != nil {
+		return false
+	}
+	q := u.Query()
+	q.Set("s", "64")
+	u.RawQuery = q.Encode()
+	req, err := http.NewRequest(http.MethodGet, u.String(), nil)
+	if err != nil {
+		return false
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0")
+	if c.token != "" {
+		req.Header.Set("Authorization", "Bearer "+c.token)
+	}
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return false
+	}
+	data, err := io.ReadAll(resp.Body)
+	if err != nil || len(data) == 0 {
+		return false
+	}
+	img, _, err := image.Decode(bytes.NewReader(data))
+	if err != nil {
+		return false
+	}
+	b := img.Bounds()
+	sx := max(1, b.Dx()/24)
+	sy := max(1, b.Dy()/24)
+	total := 0
+	counts := make(map[uint32]int)
+	for y := b.Min.Y; y < b.Max.Y; y += sy {
+		for x := b.Min.X; x < b.Max.X; x += sx {
+			r, g, bl, _ := img.At(x, y).RGBA()
+			counts[(r>>12)<<8|(g>>12)<<4|(bl>>12)]++
+			total++
+		}
+	}
+	if total == 0 {
+		return false
+	}
+	best := 0
+	second := 0
+	for _, n := range counts {
+		if n > best {
+			second = best
+			best = n
+		} else if n > second {
+			second = n
+		}
+	}
+	// 主色 ≥ 95% 且第二主色 < 1%：几乎纯色（GitHub 默认 identicon / 未设置头像）。
+	// 黑底品牌 logo（如 Vercel、Anthropic）通常有明显亮色内容（第二色 ≥ 2%），不会误报。
+	return best*100/total < 95 || second*100/total >= 1
 }
 
 // SearchRepos 按关键词搜索仓库（按 star 排序）。

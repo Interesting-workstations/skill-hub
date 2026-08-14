@@ -65,11 +65,8 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	h.protected(mux, "POST /api/v1/admin/official-orgs", h.createOfficialOrg)
 	h.protected(mux, "PUT /api/v1/admin/official-orgs/{owner}", h.updateOfficialOrg)
 	h.protected(mux, "DELETE /api/v1/admin/official-orgs/{owner}", h.deleteOfficialOrg)
-
-	// 抓取数据
-	h.protected(mux, "GET /api/v1/admin/data", h.listData)
-	h.protected(mux, "PUT /api/v1/admin/data/{id}/status", h.updateDataStatus)
-	h.protected(mux, "DELETE /api/v1/admin/data/{id}", h.deleteData)
+	// 一键校验：owner 是否为真正的 GitHub 组织（排查个人账号 / 不存在）
+	h.protected(mux, "GET /api/v1/admin/official-orgs/verify", h.verifyOfficialOrgs)
 	h.protected(mux, "GET /api/v1/admin/export", h.exportData)
 
 	// 文章
@@ -323,6 +320,11 @@ func (h *Handler) listOfficialOrgs(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 	response.OK(w, list)
+}
+
+// GET /api/v1/admin/official-orgs/verify —— 一键校验所有官方组织的 GitHub 类型。
+func (h *Handler) verifyOfficialOrgs(w http.ResponseWriter, _ *http.Request) {
+	response.OK(w, h.svc.VerifyOfficialOrgs())
 }
 
 // POST /api/v1/admin/official-orgs —— 新增官方组织。
