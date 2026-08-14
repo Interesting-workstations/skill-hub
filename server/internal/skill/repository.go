@@ -23,8 +23,8 @@ type Repository interface {
 
 	// ListArticles 返回全部已发布文章。
 	ListArticles() []domain.Article
-	// ArticleByID 按 ID 查询文章。
-	ArticleByID(id string) (domain.Article, bool)
+	// ArticleByID 按 ID 查询文章（ip+countView 控制浏览量去重累加）。
+	ArticleByID(id, ip string, countView bool) (domain.Article, bool)
 	// GetSiteConfig 返回站点配置。
 	GetSiteConfig() (domain.SiteConfig, bool)
 	// GetSeo 返回 SEO 配置。
@@ -92,7 +92,7 @@ func (r *memoryRepo) AllCategories() []domain.Category {
 // ---------- 公开内容（内存实现返回空/默认值） ----------
 
 func (r *memoryRepo) ListArticles() []domain.Article { return nil }
-func (r *memoryRepo) ArticleByID(id string) (domain.Article, bool) {
+func (r *memoryRepo) ArticleByID(id, ip string, countView bool) (domain.Article, bool) {
 	return domain.Article{}, false
 }
 func (r *memoryRepo) GetSiteConfig() (domain.SiteConfig, bool) {

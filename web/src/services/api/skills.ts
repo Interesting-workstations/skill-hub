@@ -72,9 +72,10 @@ export function fetchArticles(): Promise<Article[]> {
   return request<Article[]>("/articles");
 }
 
-/** GET /api/v1/articles/:id */
-export function fetchArticle(id: string): Promise<Article> {
-  return request<Article>(`/articles/${encodeURIComponent(id)}`);
+/** GET /api/v1/articles/:id —— 文章详情（countView=false 时带 ?incr=0，不累计浏览量） */
+export function fetchArticle(id: string, countView = true): Promise<Article> {
+  const qs = countView ? "" : "?incr=0";
+  return request<Article>(`/articles/${encodeURIComponent(id)}${qs}`);
 }
 
 /** GET /api/v1/site-config */

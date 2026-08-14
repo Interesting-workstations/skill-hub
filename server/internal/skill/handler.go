@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -285,14 +286,33 @@ func (h *Handler) listArticles(w http.ResponseWriter, _ *http.Request) {
 	response.OK(w, h.svc.ListArticles())
 }
 
-// GET /api/v1/articles/{id} —— 文章详情（浏览量 +1）。
+// GET /api/v1/articles/{id} —— 文章详情（浏览量 +1，同一 IP 当天去重；?incr=0 不计数）。
 func (h *Handler) getArticle(w http.ResponseWriter, r *http.Request) {
-	a, ok := h.svc.GetArticle(r.PathValue("id"))
+	// incr=0：前端已读过的文章跳过计数（localStorage 去重）
+	a, ok := h.svc.GetArticle(r.PathValue("id"), clientIP(r), r.URL.Query().Get("incr") != "0")
 	if !ok {
 		response.NotFound(w, "文章不存在")
 		return
 	}
 	response.OK(w, a)
+}
+
+// clientIP 从请求中提取客户端 IP（优先代理头，回退 RemoteAddr）。
+func clientIP(r *http.Request) string {
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		if i := strings.IndexByte(xff, ','); i > 0 {
+			return strings.TrimSpace(xff[:i])
+		}
+		return strings.TrimSpace(xff)
+	}
+	if xr := r.Header.Get("X-Real-IP"); xr != "" {
+		return strings.TrimSpace(xr)
+	}
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err == nil {
+		return host
+	}
+	return r.RemoteAddr
 }
 
 // GET /api/v1/site-config —— 站点配置（站点名 / 标语 / ICP 等）。

@@ -9,10 +9,38 @@ import PageLoading from "../../components/shared/PageLoading";
 import MarkdownContent from "../../components/shared/MarkdownContent";
 import { useI18n } from "../../i18n";
 
+// 已读文章去重：localStorage 记录访问过的文章，同一浏览器每篇只累计一次浏览量。
+const READ_KEY = "skillhub-read-articles";
+function isArticleRead(id: string): boolean {
+  try {
+    const list: string[] = JSON.parse(localStorage.getItem(READ_KEY) || "[]");
+    return list.includes(id);
+  } catch {
+    return false;
+  }
+}
+function markArticleRead(id: string): void {
+  try {
+    const list: string[] = JSON.parse(localStorage.getItem(READ_KEY) || "[]");
+    if (!list.includes(id)) {
+      list.push(id);
+      localStorage.setItem(READ_KEY, JSON.stringify(list));
+    }
+  } catch {
+    /* 忽略存储异常 */
+  }
+}
+
 export default function ArticleDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { data: article, loading } = useAsyncData(
-    () => (id ? fetchArticle(id) : Promise.reject(new Error("缺少文章 ID"))),
+    () => {
+      if (!id) return Promise.reject(new Error("缺少文章 ID"));
+      const read = isArticleRead(id);
+      if (!read) markArticleRead(id);
+      // 已读过的文章不再触发浏览量累加
+      return fetchArticle(id, !read);
+    },
     [id]
   );
   const pageRef = usePageAnimation();

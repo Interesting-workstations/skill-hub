@@ -169,9 +169,9 @@ func (s *Service) ListArticles() []domain.Article {
 	return s.repo.ListArticles()
 }
 
-// GetArticle 按 ID 返回已发布文章。
-func (s *Service) GetArticle(id string) (domain.Article, bool) {
-	return s.repo.ArticleByID(id)
+// GetArticle 按 ID 返回已发布文章（countView=true 时按 IP 当天去重累加浏览量）。
+func (s *Service) GetArticle(id, ip string, countView bool) (domain.Article, bool) {
+	return s.repo.ArticleByID(id, ip, countView)
 }
 
 // GetSiteConfig 返回站点配置。

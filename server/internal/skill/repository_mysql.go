@@ -110,6 +110,12 @@ func (r *mysqlRepo) migrate() error {
 			KEY idx_skills_category (category),
 			KEY idx_skills_author (author)
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+		`CREATE TABLE IF NOT EXISTS article_views (
+			article_id VARCHAR(150) NOT NULL,
+			ip VARCHAR(64) NOT NULL,
+			viewed_date DATE NOT NULL,
+			PRIMARY KEY (article_id, ip, viewed_date)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 	}
 	for _, stmt := range stmts {
 		if _, err := r.db.Exec(stmt); err != nil {
@@ -415,8 +421,10 @@ func (r *mysqlRepo) ListArticles() []domain.Article {
 	return out
 }
 
-// ArticleByID 按 ID 查询已发布文章；浏览量 +1（异步忽略失败）。
-func (r *mysqlRepo) ArticleByID(id string) (domain.Article, bool) {
+// ArticleByID 按 ID 查询已发布文章；浏览量去重 +1：
+//   - countView=false：不计数（前端已读过的文章，配合 ?incr=0 跳过）。
+//   - 同一 IP 当天对同一文章只计一次（article_views 表 + INSERT IGNORE 原子判断）。
+func (r *mysqlRepo) ArticleByID(id, ip string, countView bool) (domain.Article, bool) {
 	var a domain.Article
 	err := r.db.QueryRow(`SELECT id, title, status, category, author, views, updated_at, content
 		FROM articles WHERE id = ? AND status = 'published'`, id).
@@ -424,9 +432,17 @@ func (r *mysqlRepo) ArticleByID(id string) (domain.Article, bool) {
 	if err != nil {
 		return domain.Article{}, false
 	}
-	go func() {
-		_, _ = r.db.Exec(`UPDATE articles SET views = views + 1 WHERE id = ?`, id)
-	}()
+	if countView && ip != "" {
+		res, err := r.db.Exec(
+			`INSERT IGNORE INTO article_views (article_id, ip, viewed_date) VALUES (?, ?, CURDATE())`,
+			id, ip)
+		if err == nil {
+			// 仅当首次插入成功（当天该 IP 未访问过）才累加浏览量
+			if n, _ := res.RowsAffected(); n > 0 {
+				_, _ = r.db.Exec(`UPDATE articles SET views = views + 1 WHERE id = ?`, id)
+			}
+		}
+	}
 	return a, true
 }
 
