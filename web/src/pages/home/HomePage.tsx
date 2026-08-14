@@ -6,7 +6,7 @@ import { useAuthors, useCategories, useSkills } from "../../hooks/useSkillData";
 import { usePageAnimation } from "../../hooks/usePageAnimation";
 import { usePageMeta } from "../../hooks/usePageMeta";
 import PageLoading from "../../components/shared/PageLoading";
-import { useI18n } from "../../i18n";
+import { useI18n, categoryName } from "../../i18n";
 
 export default function HomePage() {
   const { t } = useI18n();
@@ -36,7 +36,7 @@ export default function HomePage() {
       {categories.map((cat) => (
         <SkillSection
           key={cat.slug}
-          title={cat.name}
+          title={categoryName(t, cat.slug, cat.name)}
           count={cat.count}
           slug={cat.slug}
           skills={cat.skills}

@@ -6,7 +6,7 @@ import { usePageMeta } from "../../hooks/usePageMeta";
 import PageContainer from "../../components/shared/PageContainer";
 import Breadcrumb from "../../components/shared/Breadcrumb";
 import PageLoading from "../../components/shared/PageLoading";
-import { useI18n } from "../../i18n";
+import { useI18n, categoryName } from "../../i18n";
 
 export default function CategoriesPage() {
   const { data: categories, loading } = useCategories();
@@ -72,7 +72,7 @@ export default function CategoriesPage() {
                cat.slug === "creative" ? "🎨" : cat.slug === "media" ? "🎬" :
                cat.slug === "productivity" ? "⚡" : "📦"}
             </span>
-            <h3 style={{ fontSize: 17, fontWeight: 600, color: "var(--color-text)", margin: "0 0 4px" }}>{cat.name}</h3>
+            <h3 style={{ fontSize: 17, fontWeight: 600, color: "var(--color-text)", margin: "0 0 4px" }}>{categoryName(t, cat.slug, cat.name)}</h3>
             <p style={{ fontSize: 13, color: "var(--color-text-secondary)", margin: 0 }}>{t("categories.skillCount", { n: cat.count })}</p>
           </Link>
         ))}

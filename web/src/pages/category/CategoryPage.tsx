@@ -7,7 +7,7 @@ import { useCategory } from "../../hooks/useSkillData";
 import PageContainer from "../../components/shared/PageContainer";
 import Breadcrumb from "../../components/shared/Breadcrumb";
 import PageLoading from "../../components/shared/PageLoading";
-import { useI18n } from "../../i18n";
+import { useI18n, categoryName } from "../../i18n";
 
 export default function CategoryPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -19,7 +19,9 @@ export default function CategoryPage() {
   const fallbackName = slug
     ? slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
     : "";
-  const displayName = category?.name ?? fallbackName;
+  const displayName = category
+    ? categoryName(t, category.slug, category.name)
+    : fallbackName;
 
   const pageRef = usePageAnimation((container, ctx) => {
     const cards = container.querySelectorAll(".skill-card");

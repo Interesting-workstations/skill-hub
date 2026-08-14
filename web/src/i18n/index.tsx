@@ -88,3 +88,20 @@ export function useI18n(): I18nValue {
       t(key, vars) as string) as I18nValue["t"],
   };
 }
+
+/**
+ * 分类名本地化：优先取语言包 categoryNames.{slug}（Development / 开发技能 等），
+ * 语言包中无该分类时回退到数据源（后端）提供的名称。
+ * @param t useI18n().t
+ * @param slug 分类 slug（如 development）
+ * @param fallback 数据源名称（后端 categories.name）
+ */
+export function categoryName(
+  t: I18nValue["t"],
+  slug: string,
+  fallback: string
+): string {
+  const key = `categoryNames.${slug}`;
+  const translated = t(key);
+  return translated !== key ? translated : fallback;
+}

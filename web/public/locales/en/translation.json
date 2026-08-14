@@ -22,7 +22,8 @@
     "categories": "All Categories",
     "articles": "Articles & Tutorials",
     "contribute": "Contribute",
-    "submitSkill": "Submit a Skill"
+    "submitSkill": "Submit a Skill",
+    "slogan": "Reusable skills for AI coding assistants"
   },
   "hero": {
     "titleMain": "Agent Skills",
@@ -45,7 +46,9 @@
     "skillCount": "{n} skills"
   },
   "sponsor": {
-    "badge": "Sponsored"
+    "badge": "Sponsored",
+    "ego": "The fastest browser for AI agents running web automation. Share your login state with Codex or Claude Code — zero cost, zero configuration.",
+    "alpha": "Get financial market data: real-time and historical stocks, ETFs, options, forex, crypto, commodities, fundamentals, technical indicators and more."
   },
   "card": {
     "download": "Download ZIP"
@@ -123,6 +126,20 @@
     "tagsHint": "Separate multiple tags with commas",
     "error": "Submission failed. Please try again later.",
     "submitting": "Submitting…"
+  },
+  "skillSection": {
+    "viewAll": "View all {n} skills"
+  },
+  "categoryNames": {
+    "development": "Development",
+    "testing": "Testing",
+    "document": "Document",
+    "browser-automation": "Browser Automation",
+    "database": "Database",
+    "creative": "Creative",
+    "media": "Media",
+    "productivity": "Productivity",
+    "security": "Security"
   },
   "error": {
     "title": "Something went wrong",

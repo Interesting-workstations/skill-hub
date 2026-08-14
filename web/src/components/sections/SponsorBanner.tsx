@@ -8,25 +8,22 @@ interface Sponsor {
   url: string;
 }
 
-const sponsors: Sponsor[] = [
-  {
-    name: "ego lite browser",
-    logo: "🌐",
-    description:
-      "ego lite 是AI代理运行网页自动化时最快的浏览器，可与Codex或Claude Code共享您的登录状态，零成本，零配置。",
-    url: "https://lite.ego.app/",
-  },
-  {
-    name: "Alpha Vantage MCP Server",
-    logo: "📊",
-    description:
-      "获取金融市场数据：实时和历史股票、ETF、期权、外汇、加密货币、大宗商品、基本面、技术指标等",
-    url: "https://mcp.alphavantage.co/",
-  },
-];
-
 export default function SponsorBanner() {
   const { t } = useI18n();
+  const sponsors: Sponsor[] = [
+    {
+      name: "ego lite browser",
+      logo: "🌐",
+      description: t("sponsor.ego"),
+      url: "https://lite.ego.app/",
+    },
+    {
+      name: "Alpha Vantage MCP Server",
+      logo: "📊",
+      description: t("sponsor.alpha"),
+      url: "https://mcp.alphavantage.co/",
+    },
+  ];
   return (
     <div className="sponsor-banner">
       {sponsors.map((s) => (

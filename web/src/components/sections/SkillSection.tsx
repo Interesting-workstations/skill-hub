@@ -1,6 +1,7 @@
 import SkillCard from "../skill/SkillCard";
 import { Link } from "react-router-dom";
 import type { Skill } from "../../data/types";
+import { useI18n } from "../../i18n";
 import "./SkillSection.css";
 
 interface Props {
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export default function SkillSection({ title, count, slug, skills, link }: Props) {
+  const { t } = useI18n();
   // 首页每个模块最多显示两行（桌面 4 个 / 移动 2 个），超出通过「查看更多」查看
   const showMore = skills.length > 2;
   const target = link ?? `/category/${slug}`;
@@ -34,7 +36,7 @@ export default function SkillSection({ title, count, slug, skills, link }: Props
       {showMore && (
         <div className="skill-section-more">
           <Link to={target} className="skill-more-btn">
-            查看全部 {count} 个技能
+            {t("skillSection.viewAll", { n: count })}
             <span aria-hidden="true">→</span>
           </Link>
         </div>

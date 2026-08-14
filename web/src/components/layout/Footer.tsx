@@ -5,13 +5,16 @@ import "./Footer.css";
 
 export default function Footer() {
   const { siteName, slogan, icp } = useSiteConfig();
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  // 英文模式下品牌名/标语用语言包（后端配置为中文），中文模式保留后端可自定义值
+  const displaySiteName = lang === "zh" ? siteName : t("brand.name");
+  const displaySlogan = lang === "zh" ? slogan : t("footer.slogan");
   return (
     <footer className="footer">
       <div className="footer-inner">
         <div className="footer-brand">
-          <span className="footer-logo-text">{siteName}</span>
-          <p className="footer-tagline">{slogan}</p>
+          <span className="footer-logo-text">{displaySiteName}</span>
+          <p className="footer-tagline">{displaySlogan}</p>
         </div>
         <div className="footer-links">
           <div className="footer-col">
@@ -31,7 +34,7 @@ export default function Footer() {
         </div>
       </div>
       <div className="footer-bottom">
-        <p>© 2026 {siteName}. Built with ❤️{icp ? <span style={{ marginLeft: 12 }}>{icp}</span> : null}</p>
+        <p>© 2026 {displaySiteName}. Built with ❤️{icp ? <span style={{ marginLeft: 12 }}>{icp}</span> : null}</p>
       </div>
     </footer>
   );

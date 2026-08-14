@@ -22,7 +22,8 @@
     "categories": "全部分类",
     "articles": "文章与教程",
     "contribute": "贡献",
-    "submitSkill": "提交技能"
+    "submitSkill": "提交技能",
+    "slogan": "AI 编程助手的可复用技能"
   },
   "hero": {
     "titleMain": "Agent Skills",
@@ -45,7 +46,9 @@
     "skillCount": "{n} 个技能"
   },
   "sponsor": {
-    "badge": "赞助"
+    "badge": "赞助",
+    "ego": "ego lite 是AI代理运行网页自动化时最快的浏览器，可与Codex或Claude Code共享您的登录状态，零成本，零配置。",
+    "alpha": "获取金融市场数据：实时和历史股票、ETF、期权、外汇、加密货币、大宗商品、基本面、技术指标等"
   },
   "card": {
     "download": "下载 ZIP"
@@ -123,6 +126,20 @@
     "tagsHint": "多个标签用逗号分隔",
     "error": "提交失败，请稍后重试",
     "submitting": "提交中…"
+  },
+  "skillSection": {
+    "viewAll": "查看全部 {n} 个技能"
+  },
+  "categoryNames": {
+    "development": "开发技能",
+    "testing": "测试技能",
+    "document": "文档处理",
+    "browser-automation": "浏览器自动化",
+    "database": "数据库",
+    "creative": "创意设计",
+    "media": "媒体处理",
+    "productivity": "效率工具",
+    "security": "安全"
   },
   "error": {
     "title": "出错了",
