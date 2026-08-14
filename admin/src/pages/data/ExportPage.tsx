@@ -1,24 +1,46 @@
 import { useState } from "react";
+import { contentApi } from "../../api/content";
+import type { ExportResult } from "../../api/content";
 
 const FORMATS = [
-  { id: "json", name: "JSON", desc: "结构化数据，适合二次处理" },
-  { id: "csv", name: "CSV", desc: "表格格式，适合 Excel 打开" },
-  { id: "markdown", name: "Markdown", desc: "适合直接作为官网内容" },
-];
+  { id: "json", name: "JSON", desc: "结构化数据，适合二次处理", mime: "application/json" },
+  { id: "csv", name: "CSV", desc: "表格格式，适合 Excel 打开", mime: "text/csv" },
+  { id: "markdown", name: "Markdown", desc: "适合直接作为官网内容", mime: "text/markdown" },
+] as const;
+
+function downloadFile(result: ExportResult) {
+  const fmt = FORMATS.find((f) => f.id === result.format);
+  const blob = new Blob([result.content], { type: fmt?.mime ?? "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = result.filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
 
 export default function ExportPage() {
-  const [format, setFormat] = useState("json");
+  const [format, setFormat] = useState<string>("json");
   const [scope, setScope] = useState("published");
   const [exporting, setExporting] = useState(false);
   const [done, setDone] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleExport = () => {
+  const handleExport = async () => {
     setExporting(true);
     setDone(false);
-    setTimeout(() => {
-      setExporting(false);
+    setError("");
+    try {
+      const result = await contentApi.exportData(format as "json" | "csv" | "markdown", scope);
+      downloadFile(result);
       setDone(true);
-    }, 800);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "导出失败，请稍后重试");
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (
@@ -78,7 +100,8 @@ export default function ExportPage() {
             <button className="btn btn-primary" onClick={handleExport} disabled={exporting}>
               {exporting ? "导出中…" : "开始导出"}
             </button>
-            {done && <span style={{ color: "var(--color-success)", fontSize: 13 }}>✓ 导出成功，文件已生成（演示）</span>}
+            {done && <span style={{ color: "var(--color-success)", fontSize: 13 }}>✓ 导出成功，已开始下载</span>}
+            {error && <span style={{ color: "var(--color-danger)", fontSize: 13 }}>{error}</span>}
           </div>
         </div>
       </div>

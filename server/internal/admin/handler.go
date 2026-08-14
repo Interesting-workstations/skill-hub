@@ -3,10 +3,16 @@ package admin
 
 import (
 	"encoding/json"
+	"errors"
+	"log"
+	"net"
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/Interesting-workstations/skill-hub/server/internal/domain"
 	"github.com/Interesting-workstations/skill-hub/server/internal/response"
+	"github.com/gorilla/websocket"
 )
 
 // Handler 后台管理 HTTP 处理器。
@@ -18,12 +24,20 @@ func NewHandler(svc *Service) *Handler {
 	return &Handler{svc: svc}
 }
 
-// Register 注册后台管理路由。登录与健康检查公开，其余需要 Bearer Token。
+// Register 注册后台管理路由。登录/刷新/退出公开，其余需要 Bearer Token。
 func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/admin/login", h.login)
+	mux.HandleFunc("POST /api/v1/admin/refresh", h.refresh)
+	mux.HandleFunc("POST /api/v1/admin/logout", h.logout)
 	mux.HandleFunc("GET /api/v1/admin/health", h.health)
 
+	h.protected(mux, "GET /api/v1/admin/session", h.session)
+	h.protected(mux, "GET /api/v1/admin/login-logs", h.loginLogs)
 	h.protected(mux, "GET /api/v1/admin/stats", h.stats)
+
+	// 执行实时推送：先换一次性 WS 票据，再建立 WebSocket 长连接
+	h.protected(mux, "POST /api/v1/admin/ws-ticket", h.wsTicket)
+	mux.HandleFunc("GET /api/v1/admin/executions/{id}/ws", h.execWS)
 
 	// 爬虫任务
 	h.protected(mux, "GET /api/v1/admin/tasks", h.listTasks)
@@ -39,7 +53,8 @@ func (h *Handler) Register(mux *http.ServeMux) {
 
 	// 失败任务
 	h.protected(mux, "GET /api/v1/admin/failures", h.listFailures)
-	h.protected(mux, "DELETE /api/v1/admin/failures/{id}", h.deleteFailure)
+	h.protected(mux, "DELETE /api/v1/admin/failures/{id}", h.ignoreFailure)
+	h.protected(mux, "POST /api/v1/admin/failures/{id}/retry", h.retryFailure)
 
 	// 爬虫配置
 	h.protected(mux, "GET /api/v1/admin/config", h.getConfig)
@@ -49,10 +64,12 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	h.protected(mux, "GET /api/v1/admin/data", h.listData)
 	h.protected(mux, "PUT /api/v1/admin/data/{id}/status", h.updateDataStatus)
 	h.protected(mux, "DELETE /api/v1/admin/data/{id}", h.deleteData)
+	h.protected(mux, "GET /api/v1/admin/export", h.exportData)
 
 	// 文章
 	h.protected(mux, "GET /api/v1/admin/articles", h.listArticles)
 	h.protected(mux, "POST /api/v1/admin/articles", h.createArticle)
+	h.protected(mux, "PUT /api/v1/admin/articles/{id}", h.updateArticle)
 	h.protected(mux, "DELETE /api/v1/admin/articles/{id}", h.deleteArticle)
 
 	// SEO / 站点
@@ -104,12 +121,81 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 		response.Fail(w, http.StatusBadRequest, 40001, "请求参数错误")
 		return
 	}
-	user, token, err := h.svc.Login(req.Username, req.Password)
-	if err != nil {
-		response.Fail(w, http.StatusUnauthorized, 40102, "用户名或密码错误")
+	// 参数合法性校验（bcrypt 密码上限 72 字节）
+	req.Username = strings.TrimSpace(req.Username)
+	if req.Username == "" || len(req.Username) > 64 || req.Password == "" || len(req.Password) > 72 {
+		response.Fail(w, http.StatusBadRequest, 40001, "请求参数错误")
 		return
 	}
-	response.OK(w, map[string]any{"token": token, "user": user})
+	result, err := h.svc.Login(req.Username, req.Password, clientIP(r), r.UserAgent())
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrAccountLocked):
+			response.Fail(w, http.StatusUnauthorized, 40103, ErrAccountLocked.Error())
+		case errors.Is(err, ErrTooManyAttempts):
+			response.Fail(w, http.StatusTooManyRequests, 42901, ErrTooManyAttempts.Error())
+		default:
+			// 统一提示，不暴露用户名是否存在或密码错误的具体原因
+			response.Fail(w, http.StatusUnauthorized, 40102, ErrBadCredentials.Error())
+		}
+		return
+	}
+	response.OK(w, result)
+}
+
+type refreshReq struct {
+	RefreshToken string `json:"refreshToken"`
+}
+
+// refresh 用 Refresh Token 换取新凭证（一次性旋转）。
+func (h *Handler) refresh(w http.ResponseWriter, r *http.Request) {
+	var req refreshReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || strings.TrimSpace(req.RefreshToken) == "" {
+		response.Fail(w, http.StatusBadRequest, 40001, "请求参数错误")
+		return
+	}
+	result, err := h.svc.RefreshToken(strings.TrimSpace(req.RefreshToken))
+	if err != nil {
+		response.Fail(w, http.StatusUnauthorized, 40102, "登录已过期，请重新登录")
+		return
+	}
+	response.OK(w, result)
+}
+
+// logout 主动退出：Access Token 进黑名单、Refresh Token 作废。
+func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
+	access := ""
+	if header := r.Header.Get("Authorization"); len(header) > 7 {
+		access = header[7:]
+	}
+	refresh := ""
+	var req refreshReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err == nil {
+		refresh = req.RefreshToken
+	}
+	h.svc.Logout(access, refresh, clientIP(r), r.UserAgent())
+	response.OK(w, map[string]string{"message": "已退出登录"})
+}
+
+// session 会话状态检查（受保护，前端启动时用于校验 Token 有效性）。
+func (h *Handler) session(w http.ResponseWriter, r *http.Request) {
+	username := authUser(h.svc, r)
+	u, err := h.svc.Session(username)
+	if err != nil {
+		response.Fail(w, http.StatusUnauthorized, 40101, "未登录或登录已过期")
+		return
+	}
+	response.OK(w, u)
+}
+
+// loginLogs 登录审计日志（受保护）。
+func (h *Handler) loginLogs(w http.ResponseWriter, _ *http.Request) {
+	logs, err := h.svc.ListLoginLogs(50)
+	if err != nil {
+		response.Fail(w, http.StatusInternalServerError, 50001, "系统错误")
+		return
+	}
+	response.OK(w, logs)
 }
 
 type pwdReq struct {
@@ -120,15 +206,20 @@ type pwdReq struct {
 func (h *Handler) changePassword(w http.ResponseWriter, r *http.Request) {
 	username := authUser(h.svc, r)
 	var req pwdReq
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.NewPassword == "" {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.OldPassword == "" || req.NewPassword == "" {
 		response.Fail(w, http.StatusBadRequest, 40001, "请求参数错误")
 		return
 	}
 	if err := h.svc.ChangePassword(username, req.OldPassword, req.NewPassword); err != nil {
-		response.Fail(w, http.StatusBadRequest, 40002, err.Error())
+		switch {
+		case errors.Is(err, ErrWeakPassword):
+			response.Fail(w, http.StatusBadRequest, 40002, ErrWeakPassword.Error())
+		default:
+			response.Fail(w, http.StatusBadRequest, 40002, ErrBadOldPassword.Error())
+		}
 		return
 	}
-	response.OK(w, map[string]string{"message": "密码已更新"})
+	response.OK(w, map[string]string{"message": "密码已更新，请重新登录"})
 }
 
 // authUser 从 token 中取出用户名（认证中间件已保证通过）。
@@ -139,6 +230,18 @@ func authUser(svc *Service, r *http.Request) string {
 		return u
 	}
 	return ""
+}
+
+// clientIP 提取客户端 IP（优先 X-Forwarded-For，回退 RemoteAddr）。
+func clientIP(r *http.Request) string {
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		return strings.TrimSpace(strings.Split(xff, ",")[0])
+	}
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
 }
 
 // ---------- 工作台 ----------
@@ -235,6 +338,95 @@ func (h *Handler) getExecution(w http.ResponseWriter, r *http.Request) {
 	response.OK(w, record)
 }
 
+// ---------- 执行实时推送（WebSocket）----------
+
+// wsTicket 为 WebSocket 连接签发一次性票据（避免把 Access Token 放进 URL）。
+func (h *Handler) wsTicket(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		ExecID string `json:"execId"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || strings.TrimSpace(req.ExecID) == "" {
+		response.Fail(w, http.StatusBadRequest, 40001, "请求参数错误")
+		return
+	}
+	ticket, err := h.svc.CreateWsTicket(strings.TrimSpace(req.ExecID))
+	if err != nil {
+		response.Fail(w, http.StatusInternalServerError, 50001, "系统错误")
+		return
+	}
+	response.OK(w, map[string]string{"ticket": ticket})
+}
+
+// execWS 建立 WebSocket 长连接，实时推送执行进度 / 日志 / 状态事件。
+// 鉴权：连接前先经 ws-ticket 换取一次性票据（?ticket=xxx），避免 token 进 URL。
+func (h *Handler) execWS(w http.ResponseWriter, r *http.Request) {
+	execID := r.PathValue("id")
+	if got, ok := h.svc.ConsumeWsTicket(r.URL.Query().Get("ticket")); !ok || got != execID {
+		http.Error(w, "无效或过期的连接票据", http.StatusUnauthorized)
+		return
+	}
+
+	upgrader := websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 4096,
+		// 单管理员后台 + 一次性票据鉴权；生产多域部署时可收紧为白名单域名
+		CheckOrigin: func(*http.Request) bool { return true },
+	}
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Printf("[ws] upgrade exec=%s failed: %v", execID, err)
+		return
+	}
+	defer conn.Close()
+
+	ch, cancel := h.svc.SubscribeExec(execID)
+	defer cancel()
+
+	// 推送初始快照：历史日志 + 当前进度 / 状态
+	if record, err := h.svc.GetExecution(execID); err == nil {
+		_ = conn.WriteJSON(domain.ExecEvent{
+			Type:     "snapshot",
+			ExecID:   execID,
+			Progress: record.Progress,
+			Status:   record.Status,
+			Logs:     record.Logs,
+			Duration: record.Duration,
+		})
+	}
+
+	// 读循环：消费客户端消息（含 Ping）以检测连接存活
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		conn.SetReadLimit(1024)
+		for {
+			if _, _, err := conn.ReadMessage(); err != nil {
+				return
+			}
+		}
+	}()
+
+	ping := time.NewTicker(30 * time.Second)
+	defer ping.Stop()
+	for {
+		select {
+		case ev, ok := <-ch:
+			if !ok {
+				return
+			}
+			if err := conn.WriteJSON(ev); err != nil {
+				return
+			}
+		case <-ping.C:
+			if err := conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(10*time.Second)); err != nil {
+				return
+			}
+		case <-done:
+			return
+		}
+	}
+}
+
 // ---------- 失败任务 ----------
 
 func (h *Handler) listFailures(w http.ResponseWriter, _ *http.Request) {
@@ -247,11 +439,29 @@ func (h *Handler) listFailures(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (h *Handler) deleteFailure(w http.ResponseWriter, r *http.Request) {
-	if err := h.svc.RetryFailure(r.PathValue("id")); err != nil {
+	if err := h.svc.IgnoreFailure(r.PathValue("id")); err != nil {
 		response.Fail(w, http.StatusInternalServerError, 50001, "系统错误")
 		return
 	}
 	response.OK(w, map[string]string{"message": "已处理"})
+}
+
+// retryFailure 重新执行失败任务（POST /api/v1/admin/failures/{id}/retry）。
+func (h *Handler) retryFailure(w http.ResponseWriter, r *http.Request) {
+	if err := h.svc.RetryFailure(r.PathValue("id")); err != nil {
+		response.Fail(w, http.StatusInternalServerError, 50001, "系统错误")
+		return
+	}
+	response.OK(w, map[string]string{"message": "已重新执行"})
+}
+
+// ignoreFailure 忽略失败任务（DELETE /api/v1/admin/failures/{id}）。
+func (h *Handler) ignoreFailure(w http.ResponseWriter, r *http.Request) {
+	if err := h.svc.IgnoreFailure(r.PathValue("id")); err != nil {
+		response.Fail(w, http.StatusInternalServerError, 50001, "系统错误")
+		return
+	}
+	response.OK(w, map[string]string{"message": "已忽略"})
 }
 
 // ---------- 爬虫配置 ----------
@@ -337,12 +547,40 @@ func (h *Handler) createArticle(w http.ResponseWriter, r *http.Request) {
 	response.OK(w, created)
 }
 
+func (h *Handler) updateArticle(w http.ResponseWriter, r *http.Request) {
+	var a domain.Article
+	if err := json.NewDecoder(r.Body).Decode(&a); err != nil || a.Title == "" {
+		response.Fail(w, http.StatusBadRequest, 40001, "标题必填")
+		return
+	}
+	updated, err := h.svc.UpdateArticle(r.PathValue("id"), a)
+	if err != nil {
+		response.Fail(w, http.StatusInternalServerError, 50001, "系统错误")
+		return
+	}
+	response.OK(w, updated)
+}
+
 func (h *Handler) deleteArticle(w http.ResponseWriter, r *http.Request) {
 	if err := h.svc.DeleteArticle(r.PathValue("id")); err != nil {
 		response.Fail(w, http.StatusInternalServerError, 50001, "系统错误")
 		return
 	}
 	response.OK(w, map[string]string{"message": "已删除"})
+}
+
+// exportData 导出技能数据（GET /api/v1/admin/export?format=json|csv|markdown&scope=all|published|approved）。
+func (h *Handler) exportData(w http.ResponseWriter, r *http.Request) {
+	format := r.URL.Query().Get("format")
+	if format == "" {
+		format = "json"
+	}
+	result, err := h.svc.ExportData(format, r.URL.Query().Get("scope"))
+	if err != nil {
+		response.Fail(w, http.StatusBadRequest, 40002, err.Error())
+		return
+	}
+	response.OK(w, result)
 }
 
 // ---------- SEO / 站点 ----------

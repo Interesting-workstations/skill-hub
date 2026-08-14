@@ -17,6 +17,7 @@ export interface Skill {
   githubUrl?: string;
   githubStars?: string;
   license?: string;
+  skillPath?: string;
   content?: SkillSection[];
 }
 
@@ -48,4 +49,33 @@ export interface Stats {
   totalCategories: number;
   officialSkills: number;
   featuredSkills: number;
+}
+
+/** 官网文章（admin 管理，官网展示） */
+export interface Article {
+  id: string;
+  title: string;
+  status: string;
+  category: string;
+  author: string;
+  views: number;
+  updatedAt: string;
+  content?: string;
+}
+
+/** 站点配置（admin 管理，官网动态读取） */
+export interface SiteConfig {
+  siteName: string;
+  slogan: string;
+  portalUrl: string;
+  icp: string;
+  contactEmail: string;
+}
+
+/** SEO 配置（admin 管理，官网动态读取） */
+export interface SeoConfig {
+  title: string;
+  description: string;
+  keywords: string;
+  ogImage: string;
 }

@@ -3,6 +3,14 @@
 import { http } from "../core/http";
 import type { Article, CrawledDataItem, DataStatus, SeoConfig, SiteConfig } from "../types";
 
+/** 导出结果（后端生成文本内容） */
+export interface ExportResult {
+  filename: string;
+  content: string;
+  format: string;
+  count: number;
+}
+
 const base = "/api/v1/admin";
 
 export const contentApi = {
@@ -10,11 +18,21 @@ export const contentApi = {
   listArticles(): Promise<Article[]> {
     return http.get<Article[]>(`${base}/articles`);
   },
-  createArticle(input: Pick<Article, "title" | "category">): Promise<Article> {
+  createArticle(input: Pick<Article, "title" | "category" | "content">): Promise<Article> {
     return http.post<Article>(`${base}/articles`, input);
+  },
+  updateArticle(id: string, input: Pick<Article, "title" | "category" | "status" | "content">): Promise<Article> {
+    return http.put<Article>(`${base}/articles/${encodeURIComponent(id)}`, input);
   },
   deleteArticle(id: string): Promise<void> {
     return http.delete<void>(`${base}/articles/${encodeURIComponent(id)}`);
+  },
+
+  /* ---- 数据导出 ---- */
+  exportData(format: "json" | "csv" | "markdown", scope?: string): Promise<ExportResult> {
+    const qs = new URLSearchParams({ format });
+    if (scope) qs.set("scope", scope);
+    return http.get<ExportResult>(`${base}/export?${qs.toString()}`);
   },
 
   /* ---- 抓取数据 ---- */

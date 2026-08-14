@@ -50,6 +50,15 @@
   border-radius: 6px;
   padding: 8px 12px;
 }
+.login-expired {
+  font-size: 13px;
+  color: var(--color-warning-text);
+  background: var(--color-warning-bg);
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-bottom: 16px;
+  text-align: center;
+}
 .login-submit {
   height: 40px;
   justify-content: center;

@@ -10,6 +10,8 @@ const CategoryPage = lazy(() => import("../../pages/category/CategoryPage"));
 const CategoriesPage = lazy(() => import("../../pages/categories/CategoriesPage"));
 const OfficialPage = lazy(() => import("../../pages/official/OfficialPage"));
 const FeaturedPage = lazy(() => import("../../pages/featured/FeaturedPage"));
+const ArticlesPage = lazy(() => import("../../pages/articles/ArticlesPage"));
+const ArticleDetailPage = lazy(() => import("../../pages/articles/ArticleDetailPage"));
 const SubmitPage = lazy(() => import("../../pages/submit/SubmitPage"));
 const NotFoundPage = lazy(() => import("../../pages/not-found/NotFoundPage"));
 
@@ -27,6 +29,8 @@ export const routes: RouteConfig[] = [
   { path: "/categories", element: <CategoriesPage /> },
   { path: "/official", element: <OfficialPage /> },
   { path: "/featured", element: <FeaturedPage /> },
+  { path: "/articles", element: <ArticlesPage /> },
+  { path: "/articles/:id", element: <ArticleDetailPage /> },
   { path: "/submit", element: <SubmitPage /> },
   { path: "*", element: <NotFoundPage /> },
 ];

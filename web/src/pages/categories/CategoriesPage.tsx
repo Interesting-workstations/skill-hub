@@ -33,7 +33,7 @@ export default function CategoriesPage() {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
         {/* Featured category */}
         <Link
-          to="/category/featured"
+          to="/featured"
           className="category-card"
           style={{
             padding: "24px",

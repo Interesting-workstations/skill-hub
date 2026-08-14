@@ -20,6 +20,17 @@ type Repository interface {
 	AllAuthors() []domain.Author
 	// AllCategories 返回全部分类（含分类下技能）。
 	AllCategories() []domain.Category
+
+	// ListArticles 返回全部已发布文章。
+	ListArticles() []domain.Article
+	// ArticleByID 按 ID 查询文章。
+	ArticleByID(id string) (domain.Article, bool)
+	// GetSiteConfig 返回站点配置。
+	GetSiteConfig() (domain.SiteConfig, bool)
+	// GetSeo 返回 SEO 配置。
+	GetSeo() (domain.SeoConfig, bool)
+	// SubmitSkill 保存用户提交的技能（进入待审核状态）。
+	SubmitSkill(s *domain.Skill) error
 }
 
 // memoryRepo 基于内存 + JSON 种子文件的实现。
@@ -76,4 +87,20 @@ func (r *memoryRepo) AllAuthors() []domain.Author {
 
 func (r *memoryRepo) AllCategories() []domain.Category {
 	return r.store.SkillCategories
+}
+
+// ---------- 公开内容（内存实现返回空/默认值） ----------
+
+func (r *memoryRepo) ListArticles() []domain.Article { return nil }
+func (r *memoryRepo) ArticleByID(id string) (domain.Article, bool) {
+	return domain.Article{}, false
+}
+func (r *memoryRepo) GetSiteConfig() (domain.SiteConfig, bool) {
+	return domain.SiteConfig{}, false
+}
+func (r *memoryRepo) GetSeo() (domain.SeoConfig, bool) {
+	return domain.SeoConfig{}, false
+}
+func (r *memoryRepo) SubmitSkill(s *domain.Skill) error {
+	return nil
 }

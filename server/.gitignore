@@ -1,1 +1,3 @@
 .env
+# 爬虫生成的临时 JSON 输出（可由 go run ./cmd/crawler 重新生成）
+data/crawled-skills.json

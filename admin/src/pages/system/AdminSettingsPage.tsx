@@ -1,7 +1,10 @@
 import { useState, type FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
+import { auth } from "../../core/auth";
 import { authApi } from "../../api/auth";
 
 export default function AdminSettingsPage() {
+  const navigate = useNavigate();
   const [displayName, setDisplayName] = useState("管理员");
   const [oldPwd, setOldPwd] = useState("");
   const [newPwd, setNewPwd] = useState("");
@@ -26,15 +29,11 @@ export default function AdminSettingsPage() {
     setPwdSaving(true);
     try {
       await authApi.changePassword(oldPwd, newPwd);
-      setPwdMsg("");
-      setOldPwd("");
-      setNewPwd("");
-      setConfirmPwd("");
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
+      // 改密后全部旧 Token 失效：清除本地凭证并跳转登录页重新登录
+      auth.clear();
+      navigate("/login?expired=1");
     } catch (err) {
       setPwdMsg(err instanceof Error ? err.message : "修改失败");
-    } finally {
       setPwdSaving(false);
     }
   };

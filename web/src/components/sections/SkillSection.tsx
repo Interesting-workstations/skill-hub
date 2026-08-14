@@ -8,16 +8,19 @@ interface Props {
   count: number;
   slug: string;
   skills: Skill[];
+  /** 覆盖跳转链接（默认 /category/{slug}；精选区块用 /featured） */
+  link?: string;
 }
 
-export default function SkillSection({ title, count, slug, skills }: Props) {
+export default function SkillSection({ title, count, slug, skills, link }: Props) {
   // 首页每个模块最多显示两行（桌面 4 个 / 移动 2 个），超出通过「查看更多」查看
   const showMore = skills.length > 2;
+  const target = link ?? `/category/${slug}`;
 
   return (
     <section className="skill-section">
       <div className="skill-section-header">
-        <a href={`/category/${slug}`} className="skill-section-title">
+        <a href={target} className="skill-section-title">
           <h2>{title}</h2>
           <span className="skill-section-count">{count}</span>
           <span className="skill-section-arrow">→</span>
@@ -30,7 +33,7 @@ export default function SkillSection({ title, count, slug, skills }: Props) {
       </div>
       {showMore && (
         <div className="skill-section-more">
-          <Link to={`/category/${slug}`} className="skill-more-btn">
+          <Link to={target} className="skill-more-btn">
             查看全部 {count} 个技能
             <span aria-hidden="true">→</span>
           </Link>

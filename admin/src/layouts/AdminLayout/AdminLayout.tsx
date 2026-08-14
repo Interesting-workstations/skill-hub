@@ -1,6 +1,7 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useApp } from "../../store/AppContext";
 import { auth } from "../../core/auth";
+import { authApi } from "../../api/auth";
 import { site } from "../../config/site";
 import "./AdminLayout.css";
 
@@ -36,8 +37,14 @@ export default function AdminLayout() {
   const { user, sidebarCollapsed, toggleSidebar } = useApp();
   const navigate = useNavigate();
 
-  const handleLogout = () => {
-    auth.logout();
+  const handleLogout = async () => {
+    // 先通知后端作废凭证（黑名单），失败也继续本地退出
+    try {
+      await authApi.logout(auth.getRefreshToken() ?? undefined);
+    } catch {
+      // 忽略：本地凭证仍会清除
+    }
+    auth.clear();
     navigate("/login");
   };
 

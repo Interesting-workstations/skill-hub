@@ -11,6 +11,8 @@ export default defineConfig({
       '/api': {
         target: process.env.VITE_API_TARGET || 'http://localhost:8080',
         changeOrigin: true,
+        // 允许 WebSocket 长连接（执行进度/日志实时推送）
+        ws: true,
       },
     },
   },

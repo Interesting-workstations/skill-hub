@@ -1,10 +1,12 @@
 import { useParams, Link } from "react-router-dom";
 import { useRef, useCallback } from "react";
 import SkillCard from "../../components/skill/SkillCard";
+import MarkdownContent from "../../components/shared/MarkdownContent";
 import { sectionEnter, buttonClick, panelEnterRight } from "../../animations";
 import { usePageAnimation } from "../../hooks/usePageAnimation";
 import { usePageMeta } from "../../hooks/usePageMeta";
-import { useSkill, useSkills } from "../../hooks/useSkillData";
+import { useSkill, useSkills, useCategories } from "../../hooks/useSkillData";
+import { skillDownloadUrl } from "../../services/api/skills";
 import PageLoading from "../../components/shared/PageLoading";
 import { site } from "../../config/site";
 import "./SkillDetailPage.css";
@@ -15,6 +17,9 @@ export default function SkillDetailPage() {
   // 同作者的其他技能（skill 未就绪时不请求）
   const { data: authorSkillsData } = useSkills(skill ? { author: skill.author } : null);
   const authorSkills = (authorSkillsData ?? []).filter((s) => s.id !== skill?.id);
+  // 全部分类（用于判断 tag 是否为真实分类，避免跳到空分类页）
+  const { data: categoryList } = useCategories();
+  const categorySlugs = new Set((categoryList ?? []).map((c) => c.slug));
   const sidebarRef = useRef<HTMLElement>(null);
   const copyBtnRef = useRef<HTMLButtonElement>(null);
 
@@ -82,7 +87,7 @@ export default function SkillDetailPage() {
                 </span>
               </div>
             </div>
-            <p className="detail-desc">{skill.description}</p>
+            <MarkdownContent content={skill.description} className="detail-desc" />
 
             {/* Install command */}
             {skill.installCommand && (
@@ -104,7 +109,7 @@ export default function SkillDetailPage() {
 
             {/* Action buttons */}
             <div className="detail-actions">
-              <a href={skill.downloadUrl} className="btn-download">
+              <a href={skillDownloadUrl(skill.id)} className="btn-download">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                   <path d="M8 2v8M5 8l3 3 3-3M3 12h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
@@ -121,23 +126,30 @@ export default function SkillDetailPage() {
             </div>
           </div>
 
-          {/* Content sections */}
+          {/* Content sections：body 各行合并为完整 markdown 文档整体渲染，
+              保留列表 / 代码块 / 表格等跨行结构 */}
           {skill.content?.map((section, i) => (
             <div key={i} className="detail-section">
               <h2>{section.heading}</h2>
-              {section.body.map((p, j) => (
-                <p key={j}>{p}</p>
-              ))}
+              {section.body.length > 0 && (
+                <MarkdownContent content={section.body.join("\n")} />
+              )}
             </div>
           ))}
 
           {/* Tags */}
           <div className="detail-tags">
-            {skill.tags.map((tag) => (
-              <Link key={tag} to={`/category/${tag}`} className="detail-tag">
-                {tag}
-              </Link>
-            ))}
+            {skill.tags.map((tag) =>
+              categorySlugs.has(tag) ? (
+                <Link key={tag} to={`/category/${tag}`} className="detail-tag">
+                  {tag}
+                </Link>
+              ) : (
+                <span key={tag} className="detail-tag">
+                  {tag}
+                </span>
+              )
+            )}
           </div>
 
           {/* License */}

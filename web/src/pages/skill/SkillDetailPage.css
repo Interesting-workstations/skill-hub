@@ -99,6 +99,17 @@
   margin: 0 0 20px;
 }
 
+/* 描述以 markdown 渲染（MarkdownContent 容器），覆盖 md-body 的基础字号 */
+.detail-desc.md-body {
+  font-size: 16px;
+  line-height: 1.7;
+  color: var(--color-text-subtle);
+}
+
+.detail-desc.md-body p {
+  margin: 0 0 10px;
+}
+
 /* Install command */
 .detail-install {
   display: flex;

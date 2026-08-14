@@ -94,6 +94,8 @@ type Article struct {
 	Author    string `json:"author"`
 	Views     int    `json:"views"`
 	UpdatedAt string `json:"updatedAt"`
+	// Content 文章正文（Markdown）。
+	Content string `json:"content,omitempty"`
 }
 
 // SeoConfig SEO 配置。
@@ -120,6 +122,36 @@ type AdminUser struct {
 	Role        string `json:"role"`
 }
 
+// LoginResult 登录成功返回的凭证（Access + Refresh + 用户信息）。
+type LoginResult struct {
+	Token        string    `json:"token"`
+	RefreshToken string    `json:"refreshToken"`
+	User         AdminUser `json:"user"`
+}
+
+// AdminLoginLog 管理员登录日志（成功/失败，供审计）。
+// 注意：绝不记录密码、Token 等敏感信息。
+type AdminLoginLog struct {
+	ID        string `json:"id"`
+	Username  string `json:"username"`
+	Action    string `json:"action"` // success / fail / logout / refresh
+	IP        string `json:"ip"`
+	UserAgent string `json:"userAgent"`
+	CreatedAt string `json:"createdAt"`
+}
+
+// ExecEvent 执行记录的实时推送事件（WebSocket）。
+type ExecEvent struct {
+	Type     string     `json:"type"` // snapshot | log | progress | status
+	ExecID   string     `json:"execId"`
+	Progress int        `json:"progress,omitempty"` // 0-100
+	Step     string     `json:"step,omitempty"`     // 当前步骤描述
+	Status   TaskStatus `json:"status,omitempty"`
+	Log      *LogLine   `json:"log,omitempty"`      // log 事件的日志行
+	Logs     []LogLine  `json:"logs,omitempty"`     // snapshot 携带的历史日志
+	Duration string     `json:"duration,omitempty"` // snapshot 携带
+}
+
 // DataStatus 抓取数据审核状态（官网技能表的 data_status 列）。
 type DataStatus string
 
@@ -129,6 +161,13 @@ const (
 	DataPublished DataStatus = "published" // 已发布（官网可见）
 	DataIgnored   DataStatus = "ignored"   // 已忽略
 )
+
+// TrendPoint 近 N 天执行趋势中的一个点。
+type TrendPoint struct {
+	Day     string `json:"day"`
+	Count   int    `json:"count"`
+	Success int    `json:"success"`
+}
 
 // AdminStats 后台工作台聚合指标。
 type AdminStats struct {
@@ -142,4 +181,6 @@ type AdminStats struct {
 	OfficialNums int `json:"officialSkills"`
 	TotalAuthors int `json:"totalAuthors"`
 	TotalCats    int `json:"totalCategories"`
+	// Trend 近 7 天执行趋势（真实统计）。
+	Trend []TrendPoint `json:"trend"`
 }

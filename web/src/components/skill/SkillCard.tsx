@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { useRef } from "react";
 import { cardHoverEnter, cardHoverLeave } from "../../animations";
+import { skillDownloadUrl } from "../../services/api/skills";
 import "./SkillCard.css";
 import type { Skill } from "../../data/types";
 
@@ -12,6 +13,17 @@ export default function SkillCard({ skill }: { skill: Skill }) {
   };
   const handleMouseLeave = () => {
     if (cardRef.current) cardHoverLeave(cardRef.current);
+  };
+
+  const handleDownload = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const a = document.createElement("a");
+    a.href = skillDownloadUrl(skill.id);
+    a.download = `${skill.id}.zip`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
   };
 
   return (
@@ -40,10 +52,7 @@ export default function SkillCard({ skill }: { skill: Skill }) {
         </div>
         <button
           className="skill-card-download"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-          }}
+          onClick={handleDownload}
           title="下载 ZIP"
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">

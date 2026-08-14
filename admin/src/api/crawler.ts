@@ -51,15 +51,22 @@ export const crawlerApi = {
     return http.get<ExecutionRecord>(`${base}/executions/${encodeURIComponent(id)}`);
   },
 
+  /** 获取 WebSocket 长连接的一次性票据（避免把 Token 放进 URL） */
+  wsTicket(execId: string): Promise<{ ticket: string }> {
+    return http.post<{ ticket: string }>(`${base}/ws-ticket`, { execId });
+  },
+
   /** 失败任务列表 */
   listFailures(): Promise<FailureRecord[]> {
     return http.get<FailureRecord[]>(`${base}/failures`);
   },
 
-  /** 处理失败任务（重试 / 忽略均标记处理） */
+  /** 处理失败任务 */
+  /** 重新执行失败任务（真正触发任务运行） */
   retryFailure(id: string): Promise<void> {
-    return http.delete<void>(`${base}/failures/${encodeURIComponent(id)}`);
+    return http.post<void>(`${base}/failures/${encodeURIComponent(id)}/retry`);
   },
+  /** 忽略失败任务（仅删除记录） */
   ignoreFailure(id: string): Promise<void> {
     return http.delete<void>(`${base}/failures/${encodeURIComponent(id)}`);
   },

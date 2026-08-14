@@ -1,0 +1,301 @@
+/* ── Markdown 渲染样式 ──
+   跟随站点设计令牌（tokens.css），覆盖标题/段落/列表/代码/表格/引用等全部元素 */
+
+.md-body {
+  font-size: 15px;
+  color: var(--color-text-subtle);
+  line-height: 1.75;
+  word-break: break-word;
+}
+
+.md-body > :first-child {
+  margin-top: 0;
+}
+
+.md-body > :last-child {
+  margin-bottom: 0;
+}
+
+/* 标题 */
+.md-body h1,
+.md-body h2,
+.md-body h3,
+.md-body h4,
+.md-body h5,
+.md-body h6 {
+  color: var(--color-text);
+  font-weight: 700;
+  line-height: 1.4;
+  margin: 28px 0 12px;
+}
+
+.md-body h1 {
+  font-size: 24px;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 8px;
+}
+
+.md-body h2 {
+  font-size: 20px;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 6px;
+}
+
+.md-body h3 {
+  font-size: 17px;
+}
+
+.md-body h4 {
+  font-size: 15px;
+}
+
+.md-body h5,
+.md-body h6 {
+  font-size: 14px;
+}
+
+/* 段落 */
+.md-body p {
+  margin: 0 0 12px;
+}
+
+/* 强调 */
+.md-body strong {
+  color: var(--color-text-label);
+  font-weight: 600;
+}
+
+.md-body em {
+  font-style: italic;
+}
+
+.md-body del {
+  color: var(--color-text-muted);
+}
+
+/* 链接 */
+.md-link {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.md-link:hover {
+  text-decoration: underline;
+}
+
+/* 列表 */
+.md-body ul,
+.md-body ol {
+  margin: 0 0 12px;
+  padding-left: 24px;
+}
+
+.md-body li {
+  margin: 4px 0;
+}
+
+.md-body li > ul,
+.md-body li > ol {
+  margin-bottom: 0;
+}
+
+.md-body ul > li::marker {
+  color: var(--color-primary);
+}
+
+.md-body ol > li::marker {
+  color: var(--color-text-secondary);
+  font-weight: 600;
+}
+
+/* GFM 任务列表 */
+.md-body .task-list-item {
+  list-style: none;
+  margin-left: -24px;
+}
+
+.md-body .task-list-item input[type="checkbox"] {
+  margin-right: 8px;
+  accent-color: var(--color-primary);
+}
+
+/* 行内代码 */
+.md-code-inline {
+  font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+  font-size: 0.875em;
+  background: var(--color-surface-code);
+  border: 1px solid var(--color-border);
+  border-radius: 5px;
+  padding: 2px 6px;
+  color: var(--color-text-label);
+}
+
+/* 代码块 */
+.md-pre {
+  background: var(--color-github-dark);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin: 0 0 16px;
+  overflow-x: auto;
+  font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #d4d4d4;
+  white-space: pre;
+  tab-size: 2;
+}
+
+/* 代码块语言标签 */
+.md-pre[data-language]::before {
+  content: attr(data-language);
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #9ca3af;
+  margin-bottom: 10px;
+  font-family: ui-sans-serif, system-ui, -apple-system, "PingFang SC", sans-serif;
+}
+
+/* ── 语法高亮 token（VS Code Dark+ 风格，适配深色代码块）── */
+.md-pre .hljs-comment,
+.md-pre .hljs-quote {
+  color: #6a9955;
+  font-style: italic;
+}
+
+.md-pre .hljs-keyword,
+.md-pre .hljs-selector-tag,
+.md-pre .hljs-doctag,
+.md-pre .hljs-template-tag,
+.md-pre .hljs-section {
+  color: #c586c0;
+}
+
+.md-pre .hljs-string,
+.md-pre .hljs-regexp,
+.md-pre .hljs-addition {
+  color: #ce9178;
+}
+
+.md-pre .hljs-number,
+.md-pre .hljs-literal {
+  color: #b5cea8;
+}
+
+.md-pre .hljs-title,
+.md-pre .hljs-title.function_,
+.md-pre .hljs-function .hljs-title {
+  color: #dcdcaa;
+}
+
+.md-pre .hljs-title.class_,
+.md-pre .hljs-type,
+.md-pre .hljs-class .hljs-title {
+  color: #4ec9b0;
+}
+
+.md-pre .hljs-built_in,
+.md-pre .hljs-symbol,
+.md-pre .hljs-bullet,
+.md-pre .hljs-variable.language_ {
+  color: #4ec9b0;
+}
+
+.md-pre .hljs-variable,
+.md-pre .hljs-attr,
+.md-pre .hljs-attribute,
+.md-pre .hljs-property,
+.md-pre .hljs-template-variable {
+  color: #9cdcfe;
+}
+
+.md-pre .hljs-operator,
+.md-pre .hljs-punctuation,
+.md-pre .hljs-params {
+  color: #d4d4d4;
+}
+
+.md-pre .hljs-tag,
+.md-pre .hljs-name,
+.md-pre .hljs-meta,
+.md-pre .hljs-selector-id,
+.md-pre .hljs-selector-class,
+.md-pre .hljs-selector-attr,
+.md-pre .hljs-selector-pseudo {
+  color: #569cd6;
+}
+
+.md-pre .hljs-emphasis {
+  font-style: italic;
+}
+
+.md-pre .hljs-strong {
+  font-weight: 700;
+}
+
+.md-pre .hljs-deletion {
+  color: #f14c4c;
+  background: rgba(248, 81, 73, 0.15);
+}
+
+/* 引用 */
+.md-body blockquote {
+  margin: 0 0 16px;
+  padding: 4px 16px;
+  border-left: 3px solid var(--color-primary);
+  background: var(--color-primary-50);
+  border-radius: 0 8px 8px 0;
+  color: var(--color-text-secondary);
+}
+
+.md-body blockquote p {
+  margin: 8px 0;
+}
+
+/* 表格 */
+.md-table-wrap {
+  overflow-x: auto;
+  margin: 0 0 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
+.md-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 14px;
+  min-width: 480px;
+}
+
+.md-table th,
+.md-table td {
+  border: 1px solid var(--color-border);
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.md-table th {
+  background: var(--color-surface-hover);
+  color: var(--color-text-label);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.md-table tbody tr:nth-child(even) {
+  background: var(--color-surface-muted);
+}
+
+/* 分割线 */
+.md-body hr {
+  border: none;
+  border-top: 1px solid var(--color-border);
+  margin: 24px 0;
+}
+
+/* 图片 */
+.md-image {
+  max-width: 100%;
+  border-radius: 8px;
+  margin: 8px 0 16px;
+}

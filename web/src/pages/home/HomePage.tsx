@@ -29,6 +29,7 @@ export default function HomePage() {
         title="精选技能"
         count={featuredSkills.length}
         slug="featured"
+        link="/featured"
         skills={featuredSkills}
       />
       {categories.map((cat) => (

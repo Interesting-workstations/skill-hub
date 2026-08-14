@@ -76,7 +76,8 @@ func truncate(s string, n int) string {
 
 // ParseContent 从 SKILL.md 正文解析为内容区块。
 // 规则：`# ` 主标题跳过（作为 name）；`## / ### ` 开始新内容区块；
-// 其余非空行追加到当前区块正文；主标题后的简介段落归入「概述」。
+// 其余行追加到当前区块正文（保留原始内容：前导空格缩进与空行，避免代码块、
+// ASCII 图在渲染时丢失结构）；主标题后的简介段落归入「概述」。
 func ParseContent(text string) []ContentSection {
 	text = stripFrontmatter(text)
 	var sections []ContentSection
@@ -84,10 +85,9 @@ func ParseContent(text string) []ContentSection {
 
 	lines := strings.Split(text, "\n")
 	for _, line := range lines {
+		line = strings.TrimSuffix(line, "\r")
 		trimmed := strings.TrimSpace(line)
-		if trimmed == "" {
-			continue
-		}
+
 		if strings.HasPrefix(trimmed, "##") || strings.HasPrefix(trimmed, "###") {
 			heading := strings.TrimSpace(strings.TrimLeft(trimmed, "# "))
 			sections = append(sections, ContentSection{Heading: heading})
@@ -101,13 +101,21 @@ func ParseContent(text string) []ContentSection {
 			sections = append(sections, ContentSection{Heading: "概述"})
 			current = len(sections) - 1
 		}
-		sections[current].Body = append(sections[current].Body, trimmed)
+		// 正文行保留原始内容（含前导/行内空格与空行）
+		sections[current].Body = append(sections[current].Body, line)
 	}
 
-	// 丢弃只有标题没有正文的区块
+	// 丢弃只有标题、正文为空（仅空行）的区块
 	var out []ContentSection
 	for _, s := range sections {
-		if len(s.Body) == 0 {
+		hasText := false
+		for _, l := range s.Body {
+			if strings.TrimSpace(l) != "" {
+				hasText = true
+				break
+			}
+		}
+		if !hasText {
 			continue
 		}
 		out = append(out, s)
@@ -118,4 +126,62 @@ func ParseContent(text string) []ContentSection {
 // stripFrontmatter 移除文档开头的 YAML frontmatter（--- ... ---）。
 func stripFrontmatter(text string) string {
 	return frontmatterRe.ReplaceAllString(text, "")
+}
+
+// commonAcronyms 展示时保持全大写的常见缩写（文件格式 / 技术术语）。
+// 用于把 skill slug（如 xlsx、pdf-chat）转成站点展示标题（XLSX、PDF Chat）。
+var commonAcronyms = map[string]bool{
+	"pdf": true, "xlsx": true, "docx": true, "csv": true, "tsv": true,
+	"html": true, "css": true, "xml": true, "json": true,
+	"api": true, "ai": true, "ui": true, "ux": true, "svg": true,
+	"png": true, "jpeg": true, "jpg": true, "gif": true, "sql": true,
+	"mcp": true, "cli": true, "sdk": true, "aws": true, "gcp": true,
+	"http": true, "https": true, "url": true, "uri": true,
+	"js": true, "ts": true, "md": true, "seo": true,
+	"gpt": true, "llm": true, "rag": true, "cot": true,
+	"ppt": true, "doc": true, "zip": true, "rest": true,
+	"ide": true, "qa": true, "e2e": true, "git": true,
+	"cpu": true, "gpu": true, "db": true, "3d": true, "2d": true,
+}
+
+// TitleCase 将技能 slug（如 frontend-design）转为展示标题（Frontend Design）。
+// 按 -、_、空格、点分词，每个全小写词首字母大写；常见缩写（commonAcronyms）保持全大写；
+// 已含大写字母的词（如 NotebookLM、PDF）保持不变。对已格式化名称幂等。
+func TitleCase(s string) string {
+	fields := strings.FieldsFunc(s, func(r rune) bool {
+		return r == '-' || r == '_' || r == ' ' || r == '.'
+	})
+	for i, w := range fields {
+		if w == "" {
+			continue
+		}
+		lw := strings.ToLower(w)
+		if commonAcronyms[lw] {
+			fields[i] = strings.ToUpper(lw)
+			continue
+		}
+		if isAllUpper(w) && len([]rune(w)) > 1 {
+			continue // 已全大写（如传入 PDF）
+		}
+		if strings.ToLower(w) != w {
+			continue // 已含大写（如 NotebookLM），保持原样
+		}
+		// 全小写词：仅首字母大写（如 frontend → Frontend）
+		fields[i] = strings.ToUpper(w[:1]) + w[1:]
+	}
+	return strings.Join(fields, " ")
+}
+
+// isAllUpper 判断字符串是否全部为大写字母/数字（忽略符号）。
+func isAllUpper(s string) bool {
+	hasLetter := false
+	for _, r := range s {
+		if r >= 'a' && r <= 'z' {
+			return false
+		}
+		if (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') {
+			hasLetter = true
+		}
+	}
+	return hasLetter
 }

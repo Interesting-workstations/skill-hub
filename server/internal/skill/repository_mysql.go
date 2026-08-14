@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/Interesting-workstations/skill-hub/server/internal/domain"
 	"github.com/go-sql-driver/mysql"
@@ -102,8 +103,10 @@ func (r *mysqlRepo) migrate() error {
 			github_url VARCHAR(500),
 			github_stars VARCHAR(64),
 			license VARCHAR(128),
+			skill_path VARCHAR(500) NOT NULL DEFAULT '',
 			tags TEXT NOT NULL,
 			content MEDIUMTEXT NOT NULL,
+			data_status VARCHAR(20) NOT NULL DEFAULT 'published',
 			KEY idx_skills_category (category),
 			KEY idx_skills_author (author)
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
@@ -112,6 +115,31 @@ func (r *mysqlRepo) migrate() error {
 		if _, err := r.db.Exec(stmt); err != nil {
 			return err
 		}
+	}
+	if err := r.ensureDataStatusColumn(); err != nil {
+		return err
+	}
+	return r.ensureSkillPathColumn()
+}
+
+// ensureSkillPathColumn 给已存在的 skills 表补充 skill_path（技能目录）列。
+func (r *mysqlRepo) ensureSkillPathColumn() error {
+	if _, err := r.db.Exec(`ALTER TABLE skills ADD COLUMN skill_path VARCHAR(500) NOT NULL DEFAULT ''`); err != nil {
+		if strings.Contains(err.Error(), "Duplicate column") {
+			return nil
+		}
+		return err
+	}
+	return nil
+}
+
+// ensureDataStatusColumn 给已存在的 skills 表补充 data_status（审核状态）列。
+func (r *mysqlRepo) ensureDataStatusColumn() error {
+	if _, err := r.db.Exec(`ALTER TABLE skills ADD COLUMN data_status VARCHAR(20) NOT NULL DEFAULT 'published'`); err != nil {
+		if strings.Contains(err.Error(), "Duplicate column") {
+			return nil
+		}
+		return err
 	}
 	return nil
 }
@@ -186,7 +214,19 @@ func (r *mysqlRepo) insertStoreTx(tx *sql.Tx, store domain.Store) error {
 		}
 	}
 	all := append(append([]domain.Skill{}, store.FeaturedSkills...), flattenCategorySkills(store.SkillCategories)...)
+	// 批内去重：ID 或同源同名（name+author+githubUrl）相同只保留第一条，防止重复入库
+	seenID := make(map[string]bool)
+	seenSource := make(map[string]bool)
 	for _, s := range all {
+		if seenID[s.ID] {
+			continue
+		}
+		sourceKey := s.Name + "|" + s.Author + "|" + s.GithubURL
+		if seenSource[sourceKey] {
+			continue
+		}
+		seenID[s.ID] = true
+		seenSource[sourceKey] = true
 		if err := insertSkill(tx, s); err != nil {
 			return err
 		}
@@ -208,11 +248,11 @@ func insertSkill(tx *sql.Tx, s domain.Skill) error {
 		`INSERT IGNORE INTO skills(
 			id, name, author, description, category, download_url,
 			is_official, is_featured, install_command, github_url,
-			github_stars, license, tags, content
-		) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			github_stars, license, skill_path, tags, content
+		) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		s.ID, s.Name, s.Author, s.Description, s.Category, s.DownloadURL,
 		boolInt(s.IsOfficial), boolInt(s.IsFeatured), s.InstallCommand, s.GithubURL,
-		s.GithubStars, s.License, string(tags), string(content),
+		s.GithubStars, s.License, s.SkillPath, string(tags), string(content),
 	)
 	return err
 }
@@ -221,7 +261,7 @@ func insertSkill(tx *sql.Tx, s domain.Skill) error {
 func (r *mysqlRepo) AllSkills() []domain.Skill {
 	rows, err := r.db.Query(`SELECT id, name, author, description, category,
 		download_url, is_official, is_featured, install_command, github_url,
-		github_stars, license, tags, content FROM skills`)
+		github_stars, license, skill_path, tags, content FROM skills`)
 	if err != nil {
 		return nil
 	}
@@ -240,7 +280,7 @@ func (r *mysqlRepo) AllSkills() []domain.Skill {
 func (r *mysqlRepo) SkillByID(id string) (domain.Skill, bool) {
 	row := r.db.QueryRow(`SELECT id, name, author, description, category,
 		download_url, is_official, is_featured, install_command, github_url,
-		github_stars, license, tags, content FROM skills WHERE id = ?`, id)
+		github_stars, license, skill_path, tags, content FROM skills WHERE id = ?`, id)
 	s, ok := scanSkill(row)
 	return s, ok
 }
@@ -300,7 +340,7 @@ func (r *mysqlRepo) AllCategories() []domain.Category {
 func (r *mysqlRepo) skillsByCategory(slug string) []domain.Skill {
 	rows, err := r.db.Query(`SELECT id, name, author, description, category,
 		download_url, is_official, is_featured, install_command, github_url,
-		github_stars, license, tags, content FROM skills WHERE category = ?`, slug)
+		github_stars, license, skill_path, tags, content FROM skills WHERE category = ?`, slug)
 	if err != nil {
 		return nil
 	}
@@ -327,7 +367,7 @@ func scanSkill(scanner rowScanner) (domain.Skill, bool) {
 	err := scanner.Scan(
 		&s.ID, &s.Name, &s.Author, &s.Description, &s.Category,
 		&s.DownloadURL, &official, &featured, &s.InstallCommand, &s.GithubURL,
-		&s.GithubStars, &s.License, &tagsRaw, &contentRaw,
+		&s.GithubStars, &s.License, &s.SkillPath, &tagsRaw, &contentRaw,
 	)
 	if err != nil {
 		return domain.Skill{}, false
@@ -352,4 +392,85 @@ func boolInt(b bool) int {
 		return 1
 	}
 	return 0
+}
+
+// ---------- 公开内容（文章 / 站点配置 / SEO / 提交技能） ----------
+
+// ListArticles 返回全部已发布文章（按更新时间倒序）。
+func (r *mysqlRepo) ListArticles() []domain.Article {
+	rows, err := r.db.Query(`SELECT id, title, status, category, author, views, updated_at, content
+		FROM articles WHERE status = 'published' ORDER BY updated_at DESC`)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	out := make([]domain.Article, 0, 8)
+	for rows.Next() {
+		var a domain.Article
+		if err := rows.Scan(&a.ID, &a.Title, &a.Status, &a.Category, &a.Author, &a.Views, &a.UpdatedAt, &a.Content); err != nil {
+			continue
+		}
+		out = append(out, a)
+	}
+	return out
+}
+
+// ArticleByID 按 ID 查询已发布文章；浏览量 +1（异步忽略失败）。
+func (r *mysqlRepo) ArticleByID(id string) (domain.Article, bool) {
+	var a domain.Article
+	err := r.db.QueryRow(`SELECT id, title, status, category, author, views, updated_at, content
+		FROM articles WHERE id = ? AND status = 'published'`, id).
+		Scan(&a.ID, &a.Title, &a.Status, &a.Category, &a.Author, &a.Views, &a.UpdatedAt, &a.Content)
+	if err != nil {
+		return domain.Article{}, false
+	}
+	go func() {
+		_, _ = r.db.Exec(`UPDATE articles SET views = views + 1 WHERE id = ?`, id)
+	}()
+	return a, true
+}
+
+// GetSiteConfig 返回站点配置（无记录时返回默认值）。
+func (r *mysqlRepo) GetSiteConfig() (domain.SiteConfig, bool) {
+	var s domain.SiteConfig
+	err := r.db.QueryRow(`SELECT site_name, slogan, portal_url, icp, contact_email FROM site_config WHERE id = 1`).
+		Scan(&s.SiteName, &s.Slogan, &s.PortalUrl, &s.ICP, &s.ContactEmail)
+	if err != nil {
+		return domain.SiteConfig{}, false
+	}
+	return s, true
+}
+
+// GetSeo 返回 SEO 配置（无记录时返回默认值）。
+func (r *mysqlRepo) GetSeo() (domain.SeoConfig, bool) {
+	var s domain.SeoConfig
+	err := r.db.QueryRow(`SELECT title, description, keywords, og_image FROM seo_config WHERE id = 1`).
+		Scan(&s.Title, &s.Description, &s.Keywords, &s.OgImage)
+	if err != nil {
+		return domain.SeoConfig{}, false
+	}
+	return s, true
+}
+
+// SubmitSkill 保存用户提交的技能：插入 skills 表并标记为待审核（data_status='pending'）。
+func (r *mysqlRepo) SubmitSkill(s *domain.Skill) error {
+	tags, err := json.Marshal(s.Tags)
+	if err != nil {
+		return err
+	}
+	content, err := json.Marshal(s.Content)
+	if err != nil {
+		return err
+	}
+	_, err = r.db.Exec(
+		`INSERT INTO skills(
+			id, name, author, description, category, download_url,
+			is_official, is_featured, install_command, github_url,
+			github_stars, license, skill_path, tags, content, data_status
+		) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		s.ID, s.Name, s.Author, s.Description, s.Category, s.DownloadURL,
+		boolInt(s.IsOfficial), boolInt(s.IsFeatured), s.InstallCommand, s.GithubURL,
+		s.GithubStars, s.License, s.SkillPath, string(tags), string(content), "pending",
+	)
+	return err
 }

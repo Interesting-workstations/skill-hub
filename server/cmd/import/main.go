@@ -136,6 +136,7 @@ func toDomainSkill(s crawler.Skill) domain.Skill {
 		GithubURL:      s.GithubURL,
 		GithubStars:    s.GithubStars,
 		License:        s.License,
+		SkillPath:      s.SkillPath,
 		Content:        content,
 	}
 }

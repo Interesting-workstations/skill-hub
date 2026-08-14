@@ -2,10 +2,13 @@
 package middleware
 
 import (
+	"bufio"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"time"
 )
@@ -68,6 +71,16 @@ type statusRecorder struct {
 func (r *statusRecorder) WriteHeader(code int) {
 	r.status = code
 	r.ResponseWriter.WriteHeader(code)
+}
+
+// Hijack 实现 http.Hijacker：WebSocket 升级需要底层连接可被劫持。
+// 若不转发，Logger 包装后的 ResponseWriter 将无法支持 WS 握手。
+func (r *statusRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	hj, ok := r.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, fmt.Errorf("ResponseWriter 不支持 Hijack")
+	}
+	return hj.Hijack()
 }
 
 func Logger(next http.Handler) http.Handler {

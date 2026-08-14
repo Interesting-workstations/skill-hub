@@ -1,6 +1,7 @@
 package skill
 
 import (
+	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -161,6 +162,88 @@ func (s *Service) GetCategory(slug string) (domain.Category, bool) {
 	return domain.Category{}, false
 }
 
+// ---------- 公开内容（文章 / 站点配置 / SEO / 提交技能） ----------
+
+// ListArticles 返回全部已发布文章。
+func (s *Service) ListArticles() []domain.Article {
+	return s.repo.ListArticles()
+}
+
+// GetArticle 按 ID 返回已发布文章。
+func (s *Service) GetArticle(id string) (domain.Article, bool) {
+	return s.repo.ArticleByID(id)
+}
+
+// GetSiteConfig 返回站点配置。
+func (s *Service) GetSiteConfig() (domain.SiteConfig, bool) {
+	return s.repo.GetSiteConfig()
+}
+
+// GetSeo 返回 SEO 配置。
+func (s *Service) GetSeo() (domain.SeoConfig, bool) {
+	return s.repo.GetSeo()
+}
+
+// SubmitSkillInput 用户提交技能的表单数据。
+type SubmitSkillInput struct {
+	Name        string   `json:"name"`
+	Author      string   `json:"author"`
+	Description string   `json:"description"`
+	Category    string   `json:"category"`
+	Tags        []string `json:"tags"`
+	DownloadURL string   `json:"downloadUrl"`
+	GithubURL   string   `json:"githubUrl"`
+}
+
+// SubmitSkill 校验并保存用户提交的技能（进入待审核状态，官方标记恒为 false）。
+func (s *Service) SubmitSkill(in SubmitSkillInput) (domain.Skill, error) {
+	in.Name = strings.TrimSpace(in.Name)
+	in.Author = strings.TrimSpace(in.Author)
+	in.Description = strings.TrimSpace(in.Description)
+	if in.Name == "" || in.Author == "" || in.Description == "" {
+		return domain.Skill{}, fmt.Errorf("技能名称、作者与描述必填")
+	}
+	if len(in.Name) > 120 || len(in.Author) > 120 {
+		return domain.Skill{}, fmt.Errorf("名称或作者过长")
+	}
+	if in.Category == "" {
+		in.Category = "other"
+	}
+	if in.DownloadURL == "" {
+		in.DownloadURL = "#"
+	}
+	// 分类 slug 化；作者允许中文，仅生成 ID 用
+	cat := Slugify(in.Category)
+	if cat == "" {
+		cat = "other"
+	}
+	// ID：author-name 形式，与爬虫规则一致
+	base := Slugify(in.Author) + "-" + Slugify(in.Name)
+	id := base
+	for i := 2; ; i++ {
+		if _, ok := s.repo.SkillByID(id); !ok {
+			break
+		}
+		id = fmt.Sprintf("%s-%d", base, i)
+	}
+	skill := domain.Skill{
+		ID:          id,
+		Name:        in.Name,
+		Author:      in.Author,
+		Description: in.Description,
+		Category:    cat,
+		Tags:        in.Tags,
+		DownloadURL: in.DownloadURL,
+		GithubURL:   in.GithubURL,
+		IsOfficial:  false,
+		IsFeatured:  false,
+	}
+	if err := s.repo.SubmitSkill(&skill); err != nil {
+		return domain.Skill{}, fmt.Errorf("提交失败，请稍后重试")
+	}
+	return skill, nil
+}
+
 // Stats 返回站点聚合统计（全部基于数据库实时计算）。
 func (s *Service) Stats() Stats {
 	all := s.repo.AllSkills()
@@ -177,4 +260,28 @@ func (s *Service) Stats() Stats {
 		OfficialSkills:  official,
 		FeaturedSkills:  len(s.FeaturedSkills(DefaultFeaturedLimit)),
 	}
+}
+
+// Slugify 转小写并将非字母数字字符替换为 -（与爬虫 ID 规则一致）。
+// 支持中文保留（用于 ID 中保留中文作者/技能名）时请改用 slugifyASCII。
+func Slugify(s string) string {
+	s = strings.ToLower(strings.TrimSpace(s))
+	var b strings.Builder
+	lastDash := false
+	for _, r := range s {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+			b.WriteRune(r)
+			lastDash = false
+		case r >= 0x4e00 && r <= 0x9fff: // CJK 统一汉字
+			b.WriteRune(r)
+			lastDash = false
+		default:
+			if !lastDash && b.Len() > 0 {
+				b.WriteByte('-')
+				lastDash = true
+			}
+		}
+	}
+	return strings.Trim(b.String(), "-")
 }

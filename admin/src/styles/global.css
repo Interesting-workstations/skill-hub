@@ -126,6 +126,80 @@ button {
   gap: 10px;
 }
 
+/* ---------- 执行实时推送（WebSocket）---------- */
+.ws-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  padding: 6px 13px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  background: var(--bg-card);
+  white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+}
+.ws-badge .ws-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+/* 已连接：实时推送中 */
+.ws-badge.on {
+  color: var(--color-success);
+  background: linear-gradient(180deg, rgba(0, 180, 42, 0.1), rgba(0, 180, 42, 0.05));
+  border-color: rgba(0, 180, 42, 0.32);
+}
+.ws-badge.on .ws-dot {
+  box-shadow: 0 0 0 3px rgba(0, 180, 42, 0.16);
+  animation: ws-pulse 1.8s ease-in-out infinite;
+}
+
+/* 连接中：品牌蓝旋转环 */
+.ws-badge.ing {
+  color: var(--color-running);
+  background: linear-gradient(180deg, rgba(22, 93, 255, 0.08), rgba(22, 93, 255, 0.03));
+  border-color: rgba(22, 93, 255, 0.28);
+}
+.ws-badge.ing .ws-dot {
+  width: 10px;
+  height: 10px;
+  background: transparent;
+  border: 2px solid rgba(22, 93, 255, 0.2);
+  border-top-color: var(--color-running);
+  animation: ws-spin 0.9s linear infinite;
+}
+
+/* 已断开 */
+.ws-badge.off {
+  color: var(--color-text-tertiary);
+  background: var(--bg-muted);
+  border-color: var(--color-border);
+}
+.ws-badge.off .ws-dot {
+  background: var(--color-text-tertiary);
+}
+@keyframes ws-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.8); }
+}
+@keyframes ws-spin {
+  to { transform: rotate(360deg); }
+}
+.exec-step {
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--color-primary);
+  font-family: ui-monospace, "SF Mono", Consolas, monospace;
+}
+
 /* ---------- 卡片 ---------- */
 .card {
   background: var(--bg-card);

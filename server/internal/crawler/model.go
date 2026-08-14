@@ -8,20 +8,23 @@ type ContentSection struct {
 
 // Skill 爬取到的技能数据，与 server 数据模型（domain.Skill）字段对齐。
 type Skill struct {
-	ID             string           `json:"id"`
-	Name           string           `json:"name"`
-	Author         string           `json:"author"`
-	Description    string           `json:"description"`
-	Tags           []string         `json:"tags"`
-	Category       string           `json:"category"`
-	DownloadURL    string           `json:"downloadUrl"`
-	IsOfficial     bool             `json:"isOfficial"`
-	IsFeatured     bool             `json:"isFeatured"`
-	InstallCommand string           `json:"installCommand,omitempty"`
-	GithubURL      string           `json:"githubUrl,omitempty"`
-	GithubStars    string           `json:"githubStars,omitempty"`
-	License        string           `json:"license,omitempty"`
-	Content        []ContentSection `json:"content,omitempty"`
+	ID             string   `json:"id"`
+	Name           string   `json:"name"`
+	Author         string   `json:"author"`
+	Description    string   `json:"description"`
+	Tags           []string `json:"tags"`
+	Category       string   `json:"category"`
+	DownloadURL    string   `json:"downloadUrl"`
+	IsOfficial     bool     `json:"isOfficial"`
+	IsFeatured     bool     `json:"isFeatured"`
+	InstallCommand string   `json:"installCommand,omitempty"`
+	GithubURL      string   `json:"githubUrl,omitempty"`
+	GithubStars    string   `json:"githubStars,omitempty"`
+	License        string   `json:"license,omitempty"`
+	// SkillPath 技能在仓库中的目录路径（如 skills/frontend-design；仓库根技能为空字符串）。
+	// 用于生成安装命令与按目录下载技能 ZIP。
+	SkillPath string           `json:"skillPath,omitempty"`
+	Content   []ContentSection `json:"content,omitempty"`
 }
 
 // Repo GitHub 仓库信息。

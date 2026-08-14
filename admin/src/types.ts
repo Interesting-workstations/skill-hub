@@ -53,6 +53,14 @@ export interface AdminStats {
   officialSkills: number;
   totalAuthors: number;
   totalCategories: number;
+  /** 近 7 天执行趋势 */
+  trend?: TrendPoint[];
+}
+
+export interface TrendPoint {
+  day: string;
+  count: number;
+  success: number;
 }
 
 /* ---------- 爬虫任务 ---------- */
@@ -156,6 +164,8 @@ export interface Article {
   author: string;
   views: number;
   updatedAt: string;
+  /** 文章正文（Markdown） */
+  content?: string;
 }
 
 export interface SeoConfig {

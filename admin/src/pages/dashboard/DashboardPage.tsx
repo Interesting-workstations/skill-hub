@@ -8,17 +8,6 @@ import type { AdminStats, ExecutionRecord, FailureRecord, CrawledDataItem } from
 import { formatNumber } from "../../utils/format";
 import "./DashboardPage.css";
 
-/** 最近 7 天执行趋势（演示数据） */
-const TREND = [
-  { day: "08-06", count: 18, success: 16 },
-  { day: "08-07", count: 21, success: 19 },
-  { day: "08-08", count: 15, success: 13 },
-  { day: "08-09", count: 24, success: 22 },
-  { day: "08-10", count: 20, success: 17 },
-  { day: "08-11", count: 26, success: 24 },
-  { day: "08-12", count: 24, success: 21 },
-];
-
 export default function DashboardPage() {
   const [executions, setExecutions] = useState<ExecutionRecord[]>([]);
   const [failures, setFailures] = useState<FailureRecord[]>([]);
@@ -54,7 +43,8 @@ export default function DashboardPage() {
     );
   }
 
-  const maxTrend = Math.max(...TREND.map((t) => t.count));
+  const trend = stats?.trend ?? [];
+  const maxTrend = Math.max(1, ...trend.map((t) => t.count));
 
   return (
     <div className="page">
@@ -82,19 +72,23 @@ export default function DashboardPage() {
       {/* 趋势 */}
       <div className="card card-pad">
         <div className="card-title">近 7 天爬虫任务执行趋势</div>
-        <div className="trend-chart">
-          {TREND.map((t) => (
-            <div className="trend-col" key={t.day}>
-              <div className="val">{t.count}</div>
-              <div
-                className="trend-bar"
-                style={{ height: `${(t.count / maxTrend) * 100}%` }}
-                title={`${t.day}：${t.count} 次，成功 ${t.success}`}
-              />
-              <div className="label">{t.day}</div>
-            </div>
-          ))}
-        </div>
+        {trend.length === 0 ? (
+          <div className="empty">暂无执行数据</div>
+        ) : (
+          <div className="trend-chart">
+            {trend.map((t) => (
+              <div className="trend-col" key={t.day}>
+                <div className="val">{t.count}</div>
+                <div
+                  className="trend-bar"
+                  style={{ height: `${(t.count / maxTrend) * 100}%` }}
+                  title={`${t.day}：${t.count} 次，成功 ${t.success}`}
+                />
+                <div className="label">{t.day}</div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* 最近执行 + 最近失败 */}

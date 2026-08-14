@@ -32,6 +32,57 @@ func TestOfficialAvatar(t *testing.T) {
 	if got := OfficialAvatar("random-org"); got != "" {
 		t.Fatalf("非官方组织应返回空串，实际 %q", got)
 	}
+	// 展示名也应能查到头像（与 GitHub owner 一致）
+	if got := OfficialAvatar("Anthropic"); got != "🅰️" {
+		t.Fatalf("OfficialAvatar(Anthropic) = %q", got)
+	}
+	if got := OfficialAvatar("Hugging Face"); got != "🤗" {
+		t.Fatalf("OfficialAvatar(Hugging Face) = %q", got)
+	}
+}
+
+func TestOfficialDisplayName(t *testing.T) {
+	cases := []struct {
+		owner, want string
+	}{
+		{"anthropics", "Anthropic"},
+		{"openai", "OpenAI"},
+		{"microsoft", "Microsoft"},
+		{"github", "GitHub"},
+		{"huggingface", "Hugging Face"},
+		{"Anthropics", "Anthropic"},  // 大小写不敏感
+		{"addyosmani", "addyosmani"}, // 非官方保留用户名
+		{"", ""},
+	}
+	for _, c := range cases {
+		if got := OfficialDisplayName(c.owner); got != c.want {
+			t.Fatalf("OfficialDisplayName(%q) = %q，期望 %q", c.owner, got, c.want)
+		}
+	}
+}
+
+func TestInstallCommand(t *testing.T) {
+	repoURL := "https://github.com/anthropics/skills"
+	if got := installCommand(repoURL, "skills/frontend-design"); got != "npx skills add https://github.com/anthropics/skills --skill frontend-design" {
+		t.Fatalf("目录技能安装命令错误: %q", got)
+	}
+	if got := installCommand(repoURL, ""); got != "npx skills add https://github.com/anthropics/skills" {
+		t.Fatalf("仓库根技能安装命令错误: %q", got)
+	}
+}
+
+func TestSkillDownloadURL(t *testing.T) {
+	repo := Repo{
+		FullName:      "anthropics/skills",
+		HTMLURL:       "https://github.com/anthropics/skills",
+		DefaultBranch: "main",
+	}
+	if got := skillDownloadURL(repo, "skills/frontend-design"); got != "https://github.com/anthropics/skills/tree/main/skills/frontend-design" {
+		t.Fatalf("目录技能下载地址错误: %q", got)
+	}
+	if got := skillDownloadURL(repo, ""); got != "https://github.com/anthropics/skills" {
+		t.Fatalf("仓库根技能下载地址错误: %q", got)
+	}
 }
 
 func TestInferCategory(t *testing.T) {

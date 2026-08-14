@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import StatCard from "../../components/StatCard";
 import { siteApi } from "../../api/site";
-import { crawlerApi } from "../../api/crawler";
 import type { Author, Skill, Stats } from "../../types";
 import { formatNumber } from "../../utils/format";
 
@@ -15,8 +14,6 @@ export default function HomepagePage() {
     siteApi.stats().then(setStats).catch(() => null);
     siteApi.authors().then(setAuthors).catch(() => []);
     siteApi.skills({ featured: true }).then(setFeatured).catch(() => []);
-    // 触发 crawler mock 以保持模块加载
-    void crawlerApi.listTasks();
   }, []);
 
   const officialAuthors = authors.filter((a) => (a.officialSkills ?? 0) > 0);

@@ -3,15 +3,18 @@
 package admin
 
 import (
+	"crypto/hmac"
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/Interesting-workstations/skill-hub/server/internal/domain"
 	"github.com/go-sql-driver/mysql"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // DataItem 抓取数据（含审核状态）。
@@ -52,8 +55,13 @@ type Repository interface {
 	DeleteData(id string) error
 
 	ListArticles() ([]domain.Article, error)
+	GetArticle(id string) (domain.Article, error)
 	CreateArticle(a *domain.Article) error
+	UpdateArticle(id string, a *domain.Article) error
 	DeleteArticle(id string) error
+
+	// ListExportSkills 返回全部技能完整数据（供导出 JSON/CSV/Markdown）。
+	ListExportSkills() ([]domain.Skill, error)
 
 	GetSeo() (domain.SeoConfig, error)
 	SaveSeo(s domain.SeoConfig) error
@@ -64,19 +72,36 @@ type Repository interface {
 	GetAdmin(username string) (AdminRecord, error)
 	UpdateAdminPassword(username, hash string) error
 
+	// 认证安全扩展
+	GetAdminAuth(username string) (AdminRecord, error)
+	UpdateAdminLogin(username, ip, ua, at string) error
+	IncAdminFail(username string) error
+	ResetAdminFail(username string) error
+	SetAdminLocked(username, until string) error
+	InsertLoginLog(l domain.AdminLoginLog) error
+	GetLoginLogs(limit int) ([]domain.AdminLoginLog, error)
+
 	SkillExists(id string) (bool, error)
 	InsertCrawledSkills(skills []InsertSkill) error
+	// 批量判重：返回已存在的 ID 集合，与已存在的 (name, author, githubUrl) 指纹集合
+	ListExistingSkillIDs(ids []string) (map[string]bool, error)
+	ListExistingSkillSources(pairs [][3]string) (map[string]bool, error)
 	CountSkills() (int, error)
 	CountOfficial() (int, error)
 	CountAuthors() (int, error)
 	Stats() (domain.AdminStats, error)
 }
 
-// AdminRecord 管理员账号记录（含密码哈希）。
+// AdminRecord 管理员账号记录（含安全相关字段；密码哈希不可逆存储）。
 type AdminRecord struct {
 	Username     string
 	PasswordHash string
 	DisplayName  string
+	LastLoginAt  string
+	LastLoginIP  string
+	LastLoginUA  string
+	FailCount    int
+	LockedUntil  string
 }
 
 // InsertSkill 爬虫结果写入 skills 表所需的字段。
@@ -91,6 +116,7 @@ type InsertSkill struct {
 	GithubURL   string
 	GithubStars string
 	License     string
+	SkillPath   string
 	Tags        []string
 	Content     []domain.ContentSection
 }
@@ -197,7 +223,8 @@ func (r *mysqlRepo) migrate() error {
 			category VARCHAR(64) NOT NULL DEFAULT '教程',
 			author VARCHAR(64) NOT NULL DEFAULT 'admin',
 			views INT NOT NULL DEFAULT 0,
-			updated_at VARCHAR(16) NOT NULL
+			updated_at VARCHAR(16) NOT NULL,
+			content MEDIUMTEXT NOT NULL
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 		`CREATE TABLE IF NOT EXISTS seo_config (
 			id TINYINT PRIMARY KEY,
@@ -214,13 +241,92 @@ func (r *mysqlRepo) migrate() error {
 			icp VARCHAR(64) NOT NULL DEFAULT '',
 			contact_email VARCHAR(128) NOT NULL DEFAULT ''
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+		`CREATE TABLE IF NOT EXISTS admin_login_logs (
+			id VARCHAR(64) PRIMARY KEY,
+			username VARCHAR(64) NOT NULL DEFAULT '',
+			action VARCHAR(16) NOT NULL,
+			ip VARCHAR(64) NOT NULL DEFAULT '',
+			user_agent VARCHAR(255) NOT NULL DEFAULT '',
+			created_at VARCHAR(32) NOT NULL,
+			KEY idx_login_username (username),
+			KEY idx_login_created (created_at)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 	}
 	for _, stmt := range stmts {
 		if _, err := r.db.Exec(stmt); err != nil {
 			return err
 		}
 	}
-	return r.ensureDataStatusColumn()
+	if err := r.ensureAdminColumns(); err != nil {
+		return err
+	}
+	if err := r.ensureDataStatusColumn(); err != nil {
+		return err
+	}
+	if err := r.ensureSkillPathColumn(); err != nil {
+		return err
+	}
+	return r.ensureArticleContentColumn()
+}
+
+// ensureArticleContentColumn 给已存在的 articles 表补充 content（正文）列。
+func (r *mysqlRepo) ensureArticleContentColumn() error {
+	if _, err := r.db.Exec(`ALTER TABLE articles ADD COLUMN content MEDIUMTEXT NOT NULL`); err != nil {
+		// 列已存在或表不存在均忽略
+		if strings.Contains(err.Error(), "Duplicate column") || strings.Contains(err.Error(), "check that column/key exists") {
+			return nil
+		}
+		return err
+	}
+	return nil
+}
+
+// adminExtraColumns 需保证存在的 admin_users 安全相关列（已有表增量迁移）。
+var adminExtraColumns = []string{
+	"last_login_at", "last_login_ip", "last_login_ua", "fail_count", "locked_until",
+}
+
+// ensureAdminColumns 给已存在的 admin_users 表补充安全相关列（缺列则 ALTER）。
+func (r *mysqlRepo) ensureAdminColumns() error {
+	existing := map[string]bool{}
+	rows, err := r.db.Query(`SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'admin_users'`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return err
+		}
+		existing[name] = true
+	}
+	for _, col := range adminExtraColumns {
+		if existing[col] {
+			continue
+		}
+		var def string
+		switch col {
+		case "last_login_at":
+			def = "VARCHAR(32) NOT NULL DEFAULT ''"
+		case "last_login_ip":
+			def = "VARCHAR(64) NOT NULL DEFAULT ''"
+		case "last_login_ua":
+			def = "VARCHAR(255) NOT NULL DEFAULT ''"
+		case "fail_count":
+			def = "INT NOT NULL DEFAULT 0"
+		case "locked_until":
+			def = "VARCHAR(32) NOT NULL DEFAULT ''"
+		}
+		if _, err := r.db.Exec(`ALTER TABLE admin_users ADD COLUMN ` + col + ` ` + def); err != nil {
+			// 并发/竞态下列可能刚被创建，忽略 Duplicate column
+			if strings.Contains(err.Error(), "Duplicate column") {
+				continue
+			}
+			return err
+		}
+	}
+	return nil
 }
 
 // ensureDataStatusColumn 给 skills 表补充 data_status 列（已存在则忽略）。
@@ -228,6 +334,18 @@ func (r *mysqlRepo) ensureDataStatusColumn() error {
 	_, err := r.db.Exec(`ALTER TABLE skills ADD COLUMN data_status VARCHAR(20) NOT NULL DEFAULT 'published'`)
 	if err != nil {
 		// 列已存在或表不存在均忽略（首次创建 skills 表时由 skill 模块负责）
+		if strings.Contains(err.Error(), "Duplicate column") || strings.Contains(err.Error(), "check that column/key exists") {
+			return nil
+		}
+		return err
+	}
+	return nil
+}
+
+// ensureSkillPathColumn 给 skills 表补充 skill_path（技能目录）列（已存在则忽略）。
+func (r *mysqlRepo) ensureSkillPathColumn() error {
+	_, err := r.db.Exec(`ALTER TABLE skills ADD COLUMN skill_path VARCHAR(500) NOT NULL DEFAULT ''`)
+	if err != nil {
 		if strings.Contains(err.Error(), "Duplicate column") || strings.Contains(err.Error(), "check that column/key exists") {
 			return nil
 		}
@@ -244,9 +362,13 @@ func (r *mysqlRepo) seed() error {
 		return err
 	}
 	if n == 0 {
+		hash, err := HashPassword("admin123")
+		if err != nil {
+			return err
+		}
 		if _, err := r.db.Exec(
 			`INSERT INTO admin_users(username, password_hash, display_name) VALUES(?,?,?)`,
-			"admin", HashPassword("admin123"), "管理员",
+			"admin", hash, "管理员",
 		); err != nil {
 			return err
 		}
@@ -311,10 +433,26 @@ func (r *mysqlRepo) seed() error {
 	return nil
 }
 
-// HashPassword 生成密码哈希（SHA-256 + 固定盐，单管理员场景足够安全）。
-func HashPassword(pwd string) string {
+// HashPassword 生成密码哈希（bcrypt，不可逆 + 自带安全比较，符合密码安全要求）。
+func HashPassword(pwd string) (string, error) {
+	b, err := bcrypt.GenerateFromPassword([]byte(pwd), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
+}
+
+// VerifyPassword 安全校验密码（恒定时间比较，避免时序攻击）。
+// 返回 (是否匹配, 是否旧格式需迁移重哈希)。
+// 旧格式为历史遗留的 SHA-256 + 固定盐，检测到且校验通过时由调用方重哈希为 bcrypt。
+func VerifyPassword(hash, pwd string) (ok, legacy bool) {
+	if strings.HasPrefix(hash, "$2") {
+		err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(pwd))
+		return err == nil, false
+	}
 	sum := sha256.Sum256([]byte("skillhub-admin-salt:" + pwd))
-	return hex.EncodeToString(sum[:])
+	expected := hex.EncodeToString(sum[:])
+	return hmac.Equal([]byte(expected), []byte(hash)), true
 }
 
 // ---------- 爬虫任务 ----------
@@ -539,7 +677,7 @@ func (r *mysqlRepo) DeleteData(id string) error {
 // ---------- 文章 ----------
 
 func (r *mysqlRepo) ListArticles() ([]domain.Article, error) {
-	rows, err := r.db.Query(`SELECT id, title, status, category, author, views, updated_at
+	rows, err := r.db.Query(`SELECT id, title, status, category, author, views, updated_at, content
 		FROM articles ORDER BY updated_at DESC`)
 	if err != nil {
 		return nil, err
@@ -548,7 +686,7 @@ func (r *mysqlRepo) ListArticles() ([]domain.Article, error) {
 	out := make([]domain.Article, 0)
 	for rows.Next() {
 		var a domain.Article
-		if err := rows.Scan(&a.ID, &a.Title, &a.Status, &a.Category, &a.Author, &a.Views, &a.UpdatedAt); err != nil {
+		if err := rows.Scan(&a.ID, &a.Title, &a.Status, &a.Category, &a.Author, &a.Views, &a.UpdatedAt, &a.Content); err != nil {
 			return nil, err
 		}
 		out = append(out, a)
@@ -556,17 +694,63 @@ func (r *mysqlRepo) ListArticles() ([]domain.Article, error) {
 	return out, rows.Err()
 }
 
+func (r *mysqlRepo) GetArticle(id string) (domain.Article, error) {
+	var a domain.Article
+	err := r.db.QueryRow(`SELECT id, title, status, category, author, views, updated_at, content
+		FROM articles WHERE id = ?`, id).
+		Scan(&a.ID, &a.Title, &a.Status, &a.Category, &a.Author, &a.Views, &a.UpdatedAt, &a.Content)
+	return a, err
+}
+
 func (r *mysqlRepo) CreateArticle(a *domain.Article) error {
 	_, err := r.db.Exec(
-		`INSERT INTO articles(id, title, status, category, author, views, updated_at)
-		 VALUES(?,?,?,?,?,0,?)`,
-		a.ID, a.Title, a.Status, a.Category, a.Author, a.UpdatedAt)
+		`INSERT INTO articles(id, title, status, category, author, views, updated_at, content)
+		 VALUES(?,?,?,?,?,0,?,?)`,
+		a.ID, a.Title, a.Status, a.Category, a.Author, a.UpdatedAt, a.Content)
+	return err
+}
+
+func (r *mysqlRepo) UpdateArticle(id string, a *domain.Article) error {
+	_, err := r.db.Exec(
+		`UPDATE articles SET title=?, status=?, category=?, author=?, updated_at=?, content=?
+		 WHERE id = ?`,
+		a.Title, a.Status, a.Category, a.Author, a.UpdatedAt, a.Content, id)
 	return err
 }
 
 func (r *mysqlRepo) DeleteArticle(id string) error {
 	_, err := r.db.Exec(`DELETE FROM articles WHERE id = ?`, id)
 	return err
+}
+
+// ListExportSkills 返回全部技能完整字段（供 JSON/CSV/Markdown 导出）。
+func (r *mysqlRepo) ListExportSkills() ([]domain.Skill, error) {
+	rows, err := r.db.Query(`SELECT id, name, author, description, category,
+		download_url, is_official, is_featured, install_command, github_url,
+		github_stars, license, skill_path, tags, content FROM skills ORDER BY author, name`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]domain.Skill, 0, 64)
+	for rows.Next() {
+		var s domain.Skill
+		var official, featured int
+		var tagsRaw, contentRaw string
+		if err := rows.Scan(
+			&s.ID, &s.Name, &s.Author, &s.Description, &s.Category,
+			&s.DownloadURL, &official, &featured, &s.InstallCommand, &s.GithubURL,
+			&s.GithubStars, &s.License, &s.SkillPath, &tagsRaw, &contentRaw,
+		); err != nil {
+			return nil, err
+		}
+		s.IsOfficial = official == 1
+		s.IsFeatured = featured == 1
+		_ = json.Unmarshal([]byte(tagsRaw), &s.Tags)
+		_ = json.Unmarshal([]byte(contentRaw), &s.Content)
+		out = append(out, s)
+	}
+	return out, rows.Err()
 }
 
 // ---------- SEO / 站点 ----------
@@ -606,9 +790,71 @@ func (r *mysqlRepo) GetAdmin(username string) (AdminRecord, error) {
 	return a, err
 }
 
+func (r *mysqlRepo) GetAdminAuth(username string) (AdminRecord, error) {
+	var a AdminRecord
+	err := r.db.QueryRow(`SELECT username, password_hash, display_name,
+		last_login_at, last_login_ip, last_login_ua, fail_count, locked_until
+		FROM admin_users WHERE username = ?`, username).
+		Scan(&a.Username, &a.PasswordHash, &a.DisplayName,
+			&a.LastLoginAt, &a.LastLoginIP, &a.LastLoginUA, &a.FailCount, &a.LockedUntil)
+	return a, err
+}
+
 func (r *mysqlRepo) UpdateAdminPassword(username, hash string) error {
 	_, err := r.db.Exec(`UPDATE admin_users SET password_hash = ? WHERE username = ?`, hash, username)
 	return err
+}
+
+// UpdateAdminLogin 更新最后登录信息（时间 / IP / UA）。
+func (r *mysqlRepo) UpdateAdminLogin(username, ip, ua, at string) error {
+	_, err := r.db.Exec(`UPDATE admin_users SET last_login_at = ?, last_login_ip = ?, last_login_ua = ? WHERE username = ?`,
+		at, ip, ua, username)
+	return err
+}
+
+func (r *mysqlRepo) IncAdminFail(username string) error {
+	_, err := r.db.Exec(`UPDATE admin_users SET fail_count = fail_count + 1 WHERE username = ?`, username)
+	return err
+}
+
+func (r *mysqlRepo) ResetAdminFail(username string) error {
+	_, err := r.db.Exec(`UPDATE admin_users SET fail_count = 0 WHERE username = ?`, username)
+	return err
+}
+
+func (r *mysqlRepo) SetAdminLocked(username, until string) error {
+	_, err := r.db.Exec(`UPDATE admin_users SET locked_until = ? WHERE username = ?`, until, username)
+	return err
+}
+
+// InsertLoginLog 写入一条登录审计日志（不含任何敏感信息）。
+func (r *mysqlRepo) InsertLoginLog(l domain.AdminLoginLog) error {
+	_, err := r.db.Exec(`INSERT INTO admin_login_logs(id, username, action, ip, user_agent, created_at)
+		VALUES(?,?,?,?,?,?)`,
+		l.ID, l.Username, l.Action, l.IP, l.UserAgent, l.CreatedAt)
+	return err
+}
+
+// GetLoginLogs 查询最近的登录审计日志。
+func (r *mysqlRepo) GetLoginLogs(limit int) ([]domain.AdminLoginLog, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	rows, err := r.db.Query(`SELECT id, username, action, ip, user_agent, created_at
+		FROM admin_login_logs ORDER BY created_at DESC LIMIT ?`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]domain.AdminLoginLog, 0)
+	for rows.Next() {
+		var l domain.AdminLoginLog
+		if err := rows.Scan(&l.ID, &l.Username, &l.Action, &l.IP, &l.UserAgent, &l.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, l)
+	}
+	return out, rows.Err()
 }
 
 // ---------- 执行辅助 ----------
@@ -617,6 +863,60 @@ func (r *mysqlRepo) SkillExists(id string) (bool, error) {
 	var n int
 	err := r.db.QueryRow(`SELECT COUNT(*) FROM skills WHERE id = ?`, id).Scan(&n)
 	return n > 0, err
+}
+
+// ListExistingSkillIDs 批量查询已存在的技能 ID（返回存在的 ID 集合）。
+func (r *mysqlRepo) ListExistingSkillIDs(ids []string) (map[string]bool, error) {
+	out := make(map[string]bool)
+	if len(ids) == 0 {
+		return out, nil
+	}
+	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(ids)), ",")
+	args := make([]any, len(ids))
+	for i, id := range ids {
+		args[i] = id
+	}
+	rows, err := r.db.Query(`SELECT id FROM skills WHERE id IN (`+placeholders+`)`, args...)
+	if err != nil {
+		return out, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return out, err
+		}
+		out[id] = true
+	}
+	return out, rows.Err()
+}
+
+// ListExistingSkillSources 批量查询已存在的 (name, author, githubUrl) 指纹。
+// 返回 "name|author|githubUrl" 集合；同源同名视为同一技能，用于防重复入库。
+func (r *mysqlRepo) ListExistingSkillSources(pairs [][3]string) (map[string]bool, error) {
+	out := make(map[string]bool)
+	if len(pairs) == 0 {
+		return out, nil
+	}
+	conds := make([]string, 0, len(pairs))
+	args := make([]any, 0, len(pairs)*3)
+	for _, p := range pairs {
+		conds = append(conds, "(name = ? AND author = ? AND github_url = ?)")
+		args = append(args, p[0], p[1], p[2])
+	}
+	rows, err := r.db.Query(`SELECT name, author, github_url FROM skills WHERE `+strings.Join(conds, " OR "), args...)
+	if err != nil {
+		return out, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var name, author, url string
+		if err := rows.Scan(&name, &author, &url); err != nil {
+			return out, err
+		}
+		out[name+"|"+author+"|"+url] = true
+	}
+	return out, rows.Err()
 }
 
 func (r *mysqlRepo) InsertCrawledSkills(skills []InsertSkill) error {
@@ -634,10 +934,10 @@ func (r *mysqlRepo) InsertCrawledSkills(skills []InsertSkill) error {
 		}
 		if _, err := tx.Exec(
 			`INSERT INTO skills(id, name, author, description, category, download_url,
-				is_official, is_featured, install_command, github_url, github_stars, license, tags, content, data_status)
-			 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+				is_official, is_featured, install_command, github_url, github_stars, license, skill_path, tags, content, data_status)
+			 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 			s.ID, s.Name, s.Author, s.Description, s.Category, s.DownloadURL,
-			official, 0, "", s.GithubURL, s.GithubStars, s.License, string(tags), string(content), "pending",
+			official, 0, "", s.GithubURL, s.GithubStars, s.License, s.SkillPath, string(tags), string(content), "pending",
 		); err != nil {
 			return err
 		}
@@ -675,7 +975,48 @@ func (r *mysqlRepo) Stats() (domain.AdminStats, error) {
 	_ = r.db.QueryRow(`SELECT COUNT(*) FROM categories`).Scan(&st.TotalCats)
 	// 今日成功 / 新增数据（简化：执行记录中成功数）
 	_ = r.db.QueryRow(`SELECT COUNT(*) FROM crawl_executions WHERE status = 'success'`).Scan(&st.RunSuccess)
+	st.Trend = r.execTrend(7)
 	return st, nil
+}
+
+// execTrend 统计近 n 天（含今天）每天的执行次数与成功次数。
+// 按 crawl_executions.start_time 的前 10 位（YYYY-MM-DD）聚合，无记录的天补 0。
+func (r *mysqlRepo) execTrend(n int) []domain.TrendPoint {
+	if n <= 0 {
+		n = 7
+	}
+	days := make([]string, 0, n)
+	now := time.Now()
+	for i := n - 1; i >= 0; i-- {
+		days = append(days, now.AddDate(0, 0, -i).Format("2006-01-02"))
+	}
+	counts := map[string]int{}
+	successes := map[string]int{}
+	rows, err := r.db.Query(`SELECT LEFT(start_time, 10) AS day, COUNT(*),
+		COALESCE(SUM(status = 'success'), 0)
+		FROM crawl_executions
+		WHERE start_time <> '' AND start_time >= ?
+		GROUP BY day`, days[0])
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var day string
+			var count, success int
+			if err := rows.Scan(&day, &count, &success); err == nil {
+				counts[day] = count
+				successes[day] = success
+			}
+		}
+	}
+	out := make([]domain.TrendPoint, 0, n)
+	for _, day := range days {
+		out = append(out, domain.TrendPoint{
+			Day:     day[5:], // MM-DD
+			Count:   counts[day],
+			Success: successes[day],
+		})
+	}
+	return out
 }
 
 // update 通用更新：仅更新 fields 中出现的列。
