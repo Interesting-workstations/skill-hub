@@ -5,6 +5,8 @@ import (
 	"path"
 	"sort"
 	"strings"
+	"sync"
+	"sync/atomic"
 )
 
 // CrawlOptions 爬取选项。
@@ -42,7 +44,9 @@ func (c *Client) Crawl(opts CrawlOptions) ([]Skill, error) {
 
 // CrawlDetailed 与 Crawl 相同，但额外返回每个仓库的失败信息（供后台监控）。
 // 每处理完一个仓库会调用 opts.OnProgress（如有）以推送实时进度。
+// 仓库并发爬取（信号量限流），大幅缩短大批量仓库（如自动发现官方仓库）的耗时。
 func (c *Client) CrawlDetailed(opts CrawlOptions) ([]Skill, []RepoFailure, error) {
+	var mu sync.Mutex
 	seen := make(map[string]bool)       // ID 指纹
 	seenSource := make(map[string]bool) // name|author|githubUrl 指纹（同源同名视为同一技能）
 	var skills []Skill
@@ -62,43 +66,62 @@ func (c *Client) CrawlDetailed(opts CrawlOptions) ([]Skill, []RepoFailure, error
 	}
 
 	total := len(repos)
-	for i, fullName := range repos {
-		repo, err := c.GetRepo(fullName)
-		if err != nil {
-			failures = append(failures, RepoFailure{Repo: fullName, Reason: "获取仓库失败", Error: err.Error()})
-			if opts.OnProgress != nil {
-				opts.OnProgress(i+1, total)
+	var done int32
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, 4) // 并发爬取仓库数（避免 GitHub API 限流）
+	for _, fullName := range repos {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(fullName string) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			repo, err := c.GetRepo(fullName)
+			if err != nil {
+				mu.Lock()
+				failures = append(failures, RepoFailure{Repo: fullName, Reason: "获取仓库失败", Error: err.Error()})
+				mu.Unlock()
+				notifyProgress(opts.OnProgress, &done, total)
+				return
 			}
-			continue
-		}
-		got, err := c.crawlRepo(repo)
-		if err != nil {
-			failures = append(failures, RepoFailure{Repo: fullName, Reason: "解析仓库失败", Error: err.Error()})
-			if opts.OnProgress != nil {
-				opts.OnProgress(i+1, total)
+			got, err := c.crawlRepo(repo)
+			if err != nil {
+				mu.Lock()
+				failures = append(failures, RepoFailure{Repo: fullName, Reason: "解析仓库失败", Error: err.Error()})
+				mu.Unlock()
+				notifyProgress(opts.OnProgress, &done, total)
+				return
 			}
-			continue
-		}
-		for _, s := range got {
-			if seen[s.ID] {
-				continue
+			mu.Lock()
+			for _, s := range got {
+				if seen[s.ID] {
+					continue
+				}
+				// 同源同名（name + author + githubUrl）视为同一技能，跳过重复
+				sourceKey := s.Name + "|" + s.Author + "|" + s.GithubURL
+				if seenSource[sourceKey] {
+					continue
+				}
+				seen[s.ID] = true
+				seenSource[sourceKey] = true
+				skills = append(skills, s)
 			}
-			// 同源同名（name + author + githubUrl）视为同一技能，跳过重复
-			sourceKey := s.Name + "|" + s.Author + "|" + s.GithubURL
-			if seenSource[sourceKey] {
-				continue
-			}
-			seen[s.ID] = true
-			seenSource[sourceKey] = true
-			skills = append(skills, s)
-		}
-		if opts.OnProgress != nil {
-			opts.OnProgress(i+1, total)
-		}
+			mu.Unlock()
+			notifyProgress(opts.OnProgress, &done, total)
+		}(fullName)
 	}
+	wg.Wait()
 
 	sort.Slice(skills, func(i, j int) bool { return skills[i].Name < skills[j].Name })
 	return skills, failures, nil
+}
+
+// notifyProgress 原子推进进度计数并回调（若已全部完成则回调 100%）。
+func notifyProgress(onProgress func(done, total int), done *int32, total int) {
+	if onProgress == nil {
+		return
+	}
+	n := int(atomic.AddInt32(done, 1))
+	onProgress(n, total)
 }
 
 // crawlRepo 解析单个仓库中的 skill。
