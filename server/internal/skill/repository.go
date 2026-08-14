@@ -97,8 +97,18 @@ func (r *memoryRepo) AllCategories() []domain.Category {
 	return r.store.SkillCategories
 }
 
+// OfficialOrgSummaries 内存实现：以 store.Authors 作为官方组织（与统计语义一致）。
 func (r *memoryRepo) OfficialOrgSummaries() []domain.OfficialOrgSummary {
-	return nil
+	out := make([]domain.OfficialOrgSummary, 0, len(r.store.Authors))
+	for _, a := range r.store.Authors {
+		out = append(out, domain.OfficialOrgSummary{
+			Owner:         a.Slug,
+			DisplayName:   a.Name,
+			Avatar:        a.Avatar,
+			OfficialCount: a.OfficialSkills,
+		})
+	}
+	return out
 }
 
 // ---------- 公开内容（内存实现返回空/默认值） ----------

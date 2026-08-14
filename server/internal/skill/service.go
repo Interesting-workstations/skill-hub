@@ -291,7 +291,7 @@ func (s *Service) Stats() Stats {
 	}
 	return Stats{
 		TotalSkills:     len(all),
-		TotalAuthors:    len(s.repo.AllAuthors()),
+		TotalAuthors:    len(s.repo.OfficialOrgSummaries()), // 官方作者 = 启用中的官方组织数
 		TotalCategories: len(s.repo.AllCategories()),
 		OfficialSkills:  official,
 		FeaturedSkills:  len(s.FeaturedSkills(DefaultFeaturedLimit)),
