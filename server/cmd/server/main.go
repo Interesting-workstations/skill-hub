@@ -49,8 +49,13 @@ func main() {
 		log.Println("✅ 已清理残留的 running 执行记录/任务")
 	}
 
-	// 启动定时调度器：按任务 schedule 字段自动触发（每天 HH:MM / 每 N 小时 / 每小时）
-	adminSvc.StartScheduler(context.Background())
+	// 启动定时调度器：按任务 schedule 字段自动触发（每天 HH:MM / 每 N 小时 / 每小时）。
+	// 本地连线上库调试时设置 SKILLHUB_DISABLE_SCHEDULER=1 可禁用，避免与线上 server 双跑爬虫。
+	if os.Getenv("SKILLHUB_DISABLE_SCHEDULER") == "1" {
+		log.Println("⏸️ 定时调度器已禁用（SKILLHUB_DISABLE_SCHEDULER=1）")
+	} else {
+		adminSvc.StartScheduler(context.Background())
+	}
 
 	srv := &http.Server{
 		Addr:         addr,

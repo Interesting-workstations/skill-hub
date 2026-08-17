@@ -35,7 +35,7 @@ export default function ConfigPage() {
       <div className="page-header">
         <div>
           <h1>爬虫配置</h1>
-          <div className="sub">全局爬虫运行参数，保存后对后续任务生效</div>
+          <div className="sub">全局爬虫运行参数，保存后对后续任务生效（GitHub Token 池请在「Token 池」页管理）</div>
         </div>
       </div>
 

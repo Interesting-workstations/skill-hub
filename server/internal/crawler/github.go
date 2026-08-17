@@ -12,6 +12,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -33,21 +34,203 @@ type OfficialOrg struct {
 	Avatar      string `json:"avatar"`
 }
 
+// tokenEntry token 池中单个 token 及其健康状态。
+type tokenEntry struct {
+	token    string
+	broken   bool      // 熔断标记：请求被拒绝/限流（401/403/429）
+	brokenAt time.Time // 熔断时间：冷却期后自动恢复重试
+}
+
+// tokenCooldown 熔断冷却期：被标记坏的 token 冷却到期后自动重新尝试。
+const tokenCooldown = 5 * time.Minute
+
+// TokenPool GitHub Token 池：管理多个 token，支持故障切换与健康检查。
+// 线程安全：可被多个 Client/goroutine 共享。
+type TokenPool struct {
+	mu      sync.Mutex
+	entries []*tokenEntry
+	next    int // 轮询游标（Round-Robin）
+}
+
+// NewTokenPool 创建 token 池；tokens 为要管理的 GitHub Token 列表。
+func NewTokenPool(tokens []string) *TokenPool {
+	p := &TokenPool{}
+	for _, t := range tokens {
+		if strings.TrimSpace(t) != "" {
+			p.entries = append(p.entries, &tokenEntry{token: strings.TrimSpace(t)})
+		}
+	}
+	return p
+}
+
+// Tokens 返回池中全部 token 字符串（含熔断中的）。
+func (p *TokenPool) Tokens() []string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	out := make([]string, 0, len(p.entries))
+	for _, e := range p.entries {
+		out = append(out, e.token)
+	}
+	return out
+}
+
+// Pick 轮询选取一个当前可用（未熔断或已过冷却期）的 token；无可用时返回空串。
+func (p *TokenPool) Pick() string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if len(p.entries) == 0 {
+		return ""
+	}
+	for i := 0; i < len(p.entries); i++ {
+		idx := (p.next + i) % len(p.entries)
+		e := p.entries[idx]
+		if !e.broken || time.Since(e.brokenAt) > tokenCooldown {
+			// 冷却到期自动恢复
+			if e.broken {
+				e.broken = false
+				e.brokenAt = time.Time{}
+			}
+			p.next = (idx + 1) % len(p.entries)
+			return e.token
+		}
+	}
+	return ""
+}
+
+// HasAvailable 池中是否至少有一个可用 token。
+func (p *TokenPool) HasAvailable() bool {
+	return p.Pick() != ""
+}
+
+// MarkBroken 标记指定 token 熔断（被 GitHub 拒绝/限流），冷却期后自动恢复。
+func (p *TokenPool) MarkBroken(token string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for _, e := range p.entries {
+		if e.token == token {
+			e.broken = true
+			e.brokenAt = time.Now()
+			return
+		}
+	}
+}
+
+// MarkOK 标记指定 token 恢复可用（请求成功 / 健康检查通过）。
+func (p *TokenPool) MarkOK(token string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for _, e := range p.entries {
+		if e.token == token {
+			e.broken = false
+			e.brokenAt = time.Time{}
+			return
+		}
+	}
+}
+
+// CheckHealth 健康检查：对池中每个 token 调用 GitHub rate_limit 接口，
+// 判断其是否有效可用；同时把失效/被限流的 token 标记为熔断。
+// 返回 map[token]是否可用（用于后台展示检测结果）。
+func (p *TokenPool) CheckHealth(httpClient *http.Client) map[string]bool {
+	result := make(map[string]bool)
+	for _, t := range p.Tokens() {
+		ok := checkTokenHealth(httpClient, t)
+		result[t] = ok
+		if ok {
+			p.MarkOK(t)
+		} else {
+			p.MarkBroken(t)
+		}
+	}
+	return result
+}
+
+// TokenHealth 单个 GitHub Token 的健康检查结果（供后台展示，脱敏）。
+type TokenHealth struct {
+	Masked string `json:"masked"` // 脱敏显示（前 8 后 4）
+	OK     bool   `json:"ok"`     // 是否可用
+	Detail string `json:"detail"` // 说明（有效 / 具体错误）
+}
+
+// CheckTokenHealth 检测单个 token 是否可用（GET /rate_limit），返回脱敏结果。
+func CheckTokenHealth(httpClient *http.Client, token string) TokenHealth {
+	req, err := http.NewRequest(http.MethodGet, apiBase+"/rate_limit", nil)
+	if err != nil {
+		return TokenHealth{Masked: maskToken(token), OK: false, Detail: "请求构造失败"}
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+	req.Header.Set("Authorization", "Bearer "+token)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	resp, err := httpClient.Do(req.WithContext(ctx))
+	if err != nil {
+		return TokenHealth{Masked: maskToken(token), OK: false, Detail: "网络错误: " + err.Error()}
+	}
+	defer resp.Body.Close()
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return TokenHealth{Masked: maskToken(token), OK: true, Detail: "有效"}
+	case http.StatusUnauthorized:
+		return TokenHealth{Masked: maskToken(token), OK: false, Detail: "无效（401 未授权）"}
+	case http.StatusForbidden:
+		return TokenHealth{Masked: maskToken(token), OK: false, Detail: "被拒绝（403 无权限）"}
+	case http.StatusTooManyRequests:
+		return TokenHealth{Masked: maskToken(token), OK: false, Detail: "已限流（429 超配额）"}
+	default:
+		return TokenHealth{Masked: maskToken(token), OK: false, Detail: fmt.Sprintf("异常状态 %d", resp.StatusCode)}
+	}
+}
+
+// maskToken 脱敏 token：保留前 8 位与后 4 位，中间用 * 省略。
+func maskToken(t string) string {
+	if len(t) <= 12 {
+		return "****"
+	}
+	return t[:8] + "****" + t[len(t)-4:]
+}
+
+// checkTokenHealth 用 GET /rate_limit 探测单个 token 是否有效。
+func checkTokenHealth(httpClient *http.Client, token string) bool {
+	return CheckTokenHealth(httpClient, token).OK
+}
+
+// TokensFromEnv 从环境变量读取 GitHub Token 列表：
+// 优先 GITHUB_TOKENS（逗号分隔多个），兼容旧 GITHUB_TOKEN（单个）。
+func TokensFromEnv() []string {
+	raw := os.Getenv("GITHUB_TOKENS")
+	if strings.TrimSpace(raw) == "" {
+		if t := strings.TrimSpace(os.Getenv("GITHUB_TOKEN")); t != "" {
+			return []string{t}
+		}
+		return nil
+	}
+	var out []string
+	for _, t := range strings.Split(raw, ",") {
+		if t = strings.TrimSpace(t); t != "" {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
 // Client GitHub API 客户端（认证可显著提升速率限制）。
 type Client struct {
-	token string
+	token string     // 单个 token（兼容旧逻辑；使用 pool 时忽略）
+	pool  *TokenPool // token 池（多 token 故障切换；nil 表示单 token/匿名模式）
 	http  *http.Client
 	// officialOrgs 官方组织表（owner → 展示信息）；默认内置，可用 SetOfficialOrgs 动态覆盖。
 	officialOrgs map[string]OrgInfo
 	// stopCh 停止信号：调用 Cancel() 关闭后，进行中的请求与循环尽快退出（后台手动停止任务用）。
 	stopCh     chan struct{}
 	cancelOnce sync.Once
-	// tokenBroken 熔断标记：token 被 GitHub 限流/拒绝（401/403/429）后置位，
+	// tokenBroken 熔断标记：单 token 模式被 GitHub 限流/拒绝（401/403/429）后置位，
 	// 后续请求直接以匿名方式发起，避免每个请求都先被 token 拒绝。
 	tokenBroken bool
 }
 
 // NewClient 创建客户端；token 为空时以匿名方式请求（速率受限）。
+// 若要使用多 token 池，请用 NewClientWithTokens。
 func NewClient(token string) *Client {
 	return &Client{
 		token:        token,
@@ -57,10 +240,44 @@ func NewClient(token string) *Client {
 	}
 }
 
+// NewClientWithTokens 创建使用 token 池的客户端：多个 token 自动故障切换。
+func NewClientWithTokens(tokens []string) *Client {
+	c := NewClient("")
+	if len(tokens) > 0 {
+		c.pool = NewTokenPool(tokens)
+	}
+	return c
+}
+
+// NewClientFromEnv 从环境变量（GITHUB_TOKENS / GITHUB_TOKEN）创建带 token 池的客户端。
+func NewClientFromEnv() *Client {
+	return NewClientWithTokens(TokensFromEnv())
+}
+
+// SetTokenPool 动态设置/替换 token 池（后台配置变更后调用，立即生效）。
+func (c *Client) SetTokenPool(pool *TokenPool) {
+	c.pool = pool
+}
+
 // HasToken 是否配置且仍可用的 GitHub Token。匿名模式（无 Token / Token 已熔断）
 // GitHub 限流仅 60 次/小时，调用方应据此跳过高耗配额的自动发现并限制单次抓取量。
 func (c *Client) HasToken() bool {
+	if c.pool != nil {
+		return c.pool.HasAvailable()
+	}
 	return c.token != "" && !c.tokenBroken
+}
+
+// currentToken 返回当前可用的 token（池优先，其次单 token）；无可用返回空串。
+// 供不经过 get() 的辅助请求（如头像下载）使用。
+func (c *Client) currentToken() string {
+	if c.pool != nil {
+		return c.pool.Pick()
+	}
+	if !c.tokenBroken {
+		return c.token
+	}
+	return ""
 }
 
 // Cancel 请求停止客户端：关闭停止信号，进行中的 HTTP 请求立即取消。
@@ -79,21 +296,60 @@ func (c *Client) IsCancelled() bool {
 	}
 }
 
-// get 请求 GitHub API。优先使用 token；若 token 被限流/拒绝（401/403/429），
-// 自动熔断降级为匿名请求重试一次，避免因单个 token 异常导致整批爬取全部失败。
+// get 请求 GitHub API。
+// 池模式：轮询选取一个可用 token；若被限流/拒绝（401/403/429），自动标记该 token 熔断并切换下一个；
+// 所有 token 都失败后降级为匿名请求重试一次。
+// 单 token 模式：token 被限流/拒绝后熔断，降级匿名重试。
 func (c *Client) get(path string, out any) error {
+	if c.pool != nil {
+		return c.getWithPool(path, out)
+	}
 	withToken := c.token != "" && !c.tokenBroken
-	status, err := c.doGet(path, withToken, out)
+	status, err := c.doGet(path, c.token, out)
 	if err != nil && withToken &&
 		(status == http.StatusUnauthorized || status == http.StatusForbidden || status == http.StatusTooManyRequests) {
 		c.tokenBroken = true
-		_, err = c.doGet(path, false, out)
+		_, err = c.doGet(path, "", out)
 	}
 	return err
 }
 
-// doGet 执行一次 GET 请求（withToken 控制是否携带 Authorization 头）。返回 HTTP 状态码。
-func (c *Client) doGet(path string, withToken bool, out any) (int, error) {
+// getWithPool 池模式 GET：轮询尝试可用 token，失败自动切换，全部失败降级匿名。
+func (c *Client) getWithPool(path string, out any) error {
+	var lastErr error
+	triedAny := false
+	for {
+		tok := c.pool.Pick()
+		if tok == "" {
+			break // 无可用 token
+		}
+		triedAny = true
+		status, err := c.doGet(path, tok, out)
+		if err == nil {
+			c.pool.MarkOK(tok)
+			return nil
+		}
+		lastErr = err
+		if status == http.StatusUnauthorized || status == http.StatusForbidden || status == http.StatusTooManyRequests {
+			c.pool.MarkBroken(tok)
+			continue // 换下一个 token
+		}
+		return err // 非限流类错误（如 404 仓库不存在）直接返回
+	}
+	// 池中 token 全部失败 → 匿名重试一次（避免因 token 全失效导致整批失败）
+	if triedAny {
+		if _, err := c.doGet(path, "", out); err == nil {
+			return nil
+		}
+	}
+	if lastErr != nil {
+		return lastErr
+	}
+	return fmt.Errorf("GitHub API %s: 无可用 token", path)
+}
+
+// doGet 执行一次 GET 请求（token 为空表示匿名）。返回 HTTP 状态码。
+func (c *Client) doGet(path, token string, out any) (int, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	// 停止信号触发时取消请求上下文（手动停止任务时立即中断正在进行的请求）
@@ -110,8 +366,8 @@ func (c *Client) doGet(path string, withToken bool, out any) (int, error) {
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
 	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
-	if withToken && c.token != "" {
-		req.Header.Set("Authorization", "Bearer "+c.token)
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
 	}
 	resp, err := c.http.Do(req)
 	if err != nil {
@@ -242,8 +498,8 @@ func (c *Client) avatarLooksReal(avatarURL string) bool {
 		return false
 	}
 	req.Header.Set("User-Agent", "Mozilla/5.0")
-	if c.token != "" {
-		req.Header.Set("Authorization", "Bearer "+c.token)
+	if tok := c.currentToken(); tok != "" {
+		req.Header.Set("Authorization", "Bearer "+tok)
 	}
 	resp, err := c.http.Do(req)
 	if err != nil {

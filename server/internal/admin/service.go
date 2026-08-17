@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"regexp"
 	"strconv"
@@ -63,6 +64,9 @@ type Service struct {
 	token  []byte // 进程内签名密钥（重启后旧 token 失效）
 	mu     sync.Mutex
 
+	// tokenPool GitHub Token 池（多 token 故障切换）；后台配置变更后刷新。
+	tokenPool *crawler.TokenPool
+
 	// translator 技能标题/描述的中文翻译器（新爬取数据入库时生成 name_zh / description_zh）
 	translator *translate.Translator
 
@@ -78,9 +82,8 @@ type Service struct {
 
 // NewService 创建后台管理服务。
 func NewService(repo Repository) *Service {
-	return &Service{
+	s := &Service{
 		repo:          repo,
-		client:        crawler.NewClient(os.Getenv("GITHUB_TOKEN")),
 		token:         adminTokenSecret(),
 		translator:    translate.New(),
 		blacklist:     make(map[string]int64),
@@ -91,6 +94,153 @@ func NewService(repo Repository) *Service {
 		wsTickets:     make(map[string]wsTicket),
 		execCancels:   make(map[string]context.CancelFunc),
 	}
+	// 从环境变量初始化 token 池（后台配置加载后由 RefreshTokenPool 覆盖）
+	s.client = crawler.NewClientFromEnv()
+	s.RefreshTokenPool()
+	return s
+}
+
+// RefreshTokenPool 从数据库 github_tokens 表刷新 token 池（仅启用项），
+// 并同步到共享 client。表为空时回退环境变量（GITHUB_TOKENS / GITHUB_TOKEN）。
+// 后台增删改 token 后调用，立即对后续爬虫生效。
+func (s *Service) RefreshTokenPool() {
+	tokens := s.repoGitHubTokens()
+	if len(tokens) == 0 {
+		tokens = crawler.TokensFromEnv()
+	}
+	s.tokenPool = crawler.NewTokenPool(tokens)
+	if s.client == nil {
+		s.client = crawler.NewClient("")
+	}
+	s.client.SetTokenPool(s.tokenPool)
+	if len(tokens) > 0 {
+		log.Printf("🔑 GitHub Token 池已刷新：%d 个 token", len(tokens))
+	}
+}
+
+// repoGitHubTokens 从数据库 github_tokens 表读取启用的 token 列表。
+func (s *Service) repoGitHubTokens() []string {
+	rows, err := s.repo.ListGitHubTokens()
+	if err != nil {
+		return nil
+	}
+	var out []string
+	for _, t := range rows {
+		if t.Enabled && strings.TrimSpace(t.Token) != "" {
+			out = append(out, strings.TrimSpace(t.Token))
+		}
+	}
+	return out
+}
+
+// currentTokens 返回当前生效的 token 列表：优先 token 池（数据库启用项），回退环境变量。
+func (s *Service) currentTokens() []string {
+	if s.tokenPool != nil {
+		if ts := s.tokenPool.Tokens(); len(ts) > 0 {
+			return ts
+		}
+	}
+	if ts := s.repoGitHubTokens(); len(ts) > 0 {
+		return ts
+	}
+	return crawler.TokensFromEnv()
+}
+
+// CheckTokens 健康检查给定 token 列表（为空则检查当前池），返回脱敏结果供后台展示。
+func (s *Service) CheckTokens(tokens []string) []crawler.TokenHealth {
+	if len(tokens) == 0 {
+		tokens = s.repoGitHubTokens()
+	}
+	if len(tokens) == 0 {
+		tokens = crawler.TokensFromEnv()
+	}
+	hc := &http.Client{Timeout: 12 * time.Second}
+	out := make([]crawler.TokenHealth, 0, len(tokens))
+	for _, t := range tokens {
+		out = append(out, crawler.CheckTokenHealth(hc, t))
+	}
+	return out
+}
+
+// ---------- GitHub Token 池（后台管理） ----------
+
+// ListTokenPool 返回 token 池全部条目（token 脱敏展示，避免后台页面回显明文）。
+func (s *Service) ListTokenPool() ([]domain.GitHubToken, error) {
+	rows, err := s.repo.ListGitHubTokens()
+	if err != nil {
+		return nil, err
+	}
+	for i := range rows {
+		rows[i].Token = maskSecret(rows[i].Token)
+	}
+	return rows, nil
+}
+
+// CreateToken 新增一个 token 到池中，并刷新运行中的 token 池。
+func (s *Service) CreateToken(token, remark string) (domain.GitHubToken, error) {
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return domain.GitHubToken{}, fmt.Errorf("token 不能为空")
+	}
+	// 去重：同一 token 不重复入库
+	if rows, err := s.repo.ListGitHubTokens(); err == nil {
+		for _, t := range rows {
+			if t.Token == token {
+				return domain.GitHubToken{}, fmt.Errorf("该 token 已存在")
+			}
+		}
+	}
+	t := domain.GitHubToken{
+		ID:        newID("tok"),
+		Token:     token,
+		Remark:    strings.TrimSpace(remark),
+		Enabled:   true,
+		CreatedAt: today(),
+	}
+	if err := s.repo.CreateGitHubToken(&t); err != nil {
+		return domain.GitHubToken{}, err
+	}
+	s.RefreshTokenPool()
+	t.Token = maskSecret(t.Token)
+	return t, nil
+}
+
+// UpdateToken 更新 token 条目（token/remark/enabled；token 为空表示不修改），并刷新池。
+func (s *Service) UpdateToken(id, token, remark string, enabled *bool) error {
+	fields := map[string]any{}
+	if token = strings.TrimSpace(token); token != "" {
+		fields["token"] = token
+	}
+	fields["remark"] = strings.TrimSpace(remark)
+	if enabled != nil {
+		v := 0
+		if *enabled {
+			v = 1
+		}
+		fields["enabled"] = v
+	}
+	if err := s.repo.UpdateGitHubToken(id, fields); err != nil {
+		return err
+	}
+	s.RefreshTokenPool()
+	return nil
+}
+
+// DeleteToken 删除 token 条目，并刷新池。
+func (s *Service) DeleteToken(id string) error {
+	if err := s.repo.DeleteGitHubToken(id); err != nil {
+		return err
+	}
+	s.RefreshTokenPool()
+	return nil
+}
+
+// maskSecret 脱敏 token/密钥：保留前 8 位与后 4 位，中间省略。
+func maskSecret(s string) string {
+	if len(s) <= 12 {
+		return "****"
+	}
+	return s[:8] + "****" + s[len(s)-4:]
 }
 
 // adminTokenSecret 获取持久化的 Access Token 签名密钥。
@@ -642,7 +792,8 @@ func (s *Service) RunTask(id string) (domain.ExecutionRecord, error) {
 	}
 
 	// 每次执行使用独立爬虫客户端与可取消上下文（互不影响，支持后台手动停止）
-	client := crawler.NewClient(os.Getenv("GITHUB_TOKEN"))
+	// token 池与共享 client 一致：后台配置的 GITHUB_TOKENS（失败自动切换）
+	client := crawler.NewClientWithTokens(s.currentTokens())
 	ctx, cancel := context.WithCancel(context.Background())
 	s.execCancels[record.ID] = cancel
 
@@ -1111,7 +1262,12 @@ func (s *Service) GetConfig() (domain.CrawlerConfig, error) {
 }
 
 func (s *Service) SaveConfig(c domain.CrawlerConfig) error {
-	return s.repo.SaveConfig(c)
+	if err := s.repo.SaveConfig(c); err != nil {
+		return err
+	}
+	// 配置变更后刷新 token 池，立即对后续爬虫生效
+	s.RefreshTokenPool()
+	return nil
 }
 
 // ---------- 抓取数据（数据审核） ----------

@@ -142,6 +142,27 @@ export interface CrawlerConfig {
   officialRepos: string;
   defaultQuery: string;
   enabled: boolean;
+  /** GitHub Token 池（逗号分隔多个，自动故障切换） */
+  githubTokens: string;
+}
+
+/* ---------- GitHub Token 池 ---------- */
+export interface GitHubToken {
+  id: string;
+  /** 脱敏显示的 token（前 8 后 4） */
+  token: string;
+  remark: string;
+  enabled: boolean;
+  createdAt: string;
+}
+
+export interface TokenHealth {
+  /** 脱敏显示的 token（前 8 后 4） */
+  masked: string;
+  /** 是否可用 */
+  ok: boolean;
+  /** 说明（有效 / 具体错误） */
+  detail: string;
 }
 
 /* ---------- 抓取数据（数据管理，来自 Go 后端 skills 表） ---------- */

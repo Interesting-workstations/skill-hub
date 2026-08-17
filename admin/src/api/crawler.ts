@@ -1,7 +1,7 @@
 /** 爬虫管理 API —— 对接 skill-hub 后端（/api/v1/admin），数据全部由 Go 提供。 */
 
 import { http, ADMIN_API_BASE } from "../core/http";
-import type { AdminStats, CrawlTask, CrawlerConfig, ExecutionRecord, FailureRecord, OfficialOrg, OrgVerifyResult } from "../types";
+import type { AdminStats, CrawlTask, CrawlerConfig, ExecutionRecord, FailureRecord, GitHubToken, OfficialOrg, OrgVerifyResult, TokenHealth } from "../types";
 
 const base = ADMIN_API_BASE;
 
@@ -112,5 +112,24 @@ export const crawlerApi = {
   },
   saveConfig(config: CrawlerConfig): Promise<CrawlerConfig> {
     return http.put<CrawlerConfig>(`${base}/config`, config);
+  },
+
+  /** GitHub Token 池 */
+  listTokens(): Promise<GitHubToken[]> {
+    return http.get<GitHubToken[]>(`${base}/tokens`);
+  },
+  createToken(input: { token: string; remark?: string }): Promise<GitHubToken> {
+    return http.post<GitHubToken>(`${base}/tokens`, input);
+  },
+  updateToken(id: string, patch: { token?: string; remark?: string; enabled?: boolean }): Promise<void> {
+    return http.put<void>(`${base}/tokens/${encodeURIComponent(id)}`, patch);
+  },
+  deleteToken(id: string): Promise<void> {
+    return http.delete<void>(`${base}/tokens/${encodeURIComponent(id)}`);
+  },
+
+  /** GitHub Token 池一键检测（tokens 为空时检测当前配置） */
+  checkTokens(tokens?: string[]): Promise<TokenHealth[]> {
+    return http.post<TokenHealth[]>(`${base}/tokens/check`, { tokens: tokens ?? [] });
   },
 };

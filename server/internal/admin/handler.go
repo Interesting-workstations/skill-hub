@@ -61,6 +61,12 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	// 爬虫配置
 	h.protected(mux, "GET /api/v1/admin/config", h.getConfig)
 	h.protected(mux, "PUT /api/v1/admin/config", h.saveConfig)
+	// GitHub Token 池（独立页：表格管理 + 一键检测）
+	h.protected(mux, "GET /api/v1/admin/tokens", h.listTokens)
+	h.protected(mux, "POST /api/v1/admin/tokens", h.createToken)
+	h.protected(mux, "PUT /api/v1/admin/tokens/{id}", h.updateToken)
+	h.protected(mux, "DELETE /api/v1/admin/tokens/{id}", h.deleteToken)
+	h.protected(mux, "POST /api/v1/admin/tokens/check", h.checkTokens)
 
 	// 官方组织（动态管理）
 	h.protected(mux, "GET /api/v1/admin/official-orgs", h.listOfficialOrgs)
@@ -578,6 +584,74 @@ func (h *Handler) saveConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	response.OK(w, cfg)
+}
+
+// checkTokens 一键检测 GitHub Token 池中每个 token 是否可用（POST /api/v1/admin/tokens/check）。
+// 请求体可选 tokens 数组；为空时检测当前配置中的 token。
+func (h *Handler) checkTokens(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Tokens []string `json:"tokens"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&body)
+	results := h.svc.CheckTokens(body.Tokens)
+	response.OK(w, results)
+}
+
+// ---------- GitHub Token 池 ----------
+
+// listTokens 返回 token 池全部条目（token 脱敏展示）。
+func (h *Handler) listTokens(w http.ResponseWriter, _ *http.Request) {
+	list, err := h.svc.ListTokenPool()
+	if err != nil {
+		response.Fail(w, http.StatusInternalServerError, 50001, "系统错误")
+		return
+	}
+	response.OK(w, list)
+}
+
+// createToken 新增一个 token。
+func (h *Handler) createToken(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Token  string `json:"token"`
+		Remark string `json:"remark"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || strings.TrimSpace(body.Token) == "" {
+		response.Fail(w, http.StatusBadRequest, 40001, "token 不能为空")
+		return
+	}
+	created, err := h.svc.CreateToken(body.Token, body.Remark)
+	if err != nil {
+		response.Fail(w, http.StatusBadRequest, 40002, err.Error())
+		return
+	}
+	response.OK(w, created)
+}
+
+// updateToken 更新 token 条目（token/remark/enabled）。
+func (h *Handler) updateToken(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Token   string `json:"token"`
+		Remark  string `json:"remark"`
+		Enabled *bool  `json:"enabled"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		response.Fail(w, http.StatusBadRequest, 40001, "请求参数错误")
+		return
+	}
+	if err := h.svc.UpdateToken(r.PathValue("id"), body.Token, body.Remark, body.Enabled); err != nil {
+		response.Fail(w, http.StatusInternalServerError, 50001, "系统错误")
+		return
+	}
+	response.OK(w, map[string]string{"message": "已更新"})
+}
+
+// deleteToken 删除一个 token。
+func (h *Handler) deleteToken(w http.ResponseWriter, r *http.Request) {
+	if err := h.svc.DeleteToken(r.PathValue("id")); err != nil {
+		response.Fail(w, http.StatusInternalServerError, 50001, "系统错误")
+		return
+	}
+	response.OK(w, map[string]string{"message": "已删除"})
 }
 
 // ---------- 抓取数据 ----------

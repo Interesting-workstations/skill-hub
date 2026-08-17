@@ -18,6 +18,7 @@ const MENU: MenuItem[] = [
   { path: "/crawler/tasks", label: "爬虫任务", icon: "🕷️" },
   { path: "/crawler/executions", label: "执行记录", icon: "🕐" },
   { path: "/crawler/failures", label: "失败任务", icon: "⚠️" },
+  { path: "/crawler/tokens", label: "Token 池", icon: "🔑" },
   { path: "/crawler/config", label: "爬虫配置", icon: "🧩" },
   { path: "/crawler/official-orgs", label: "官方组织", icon: "🏛️" },
   { section: "数据管理" },

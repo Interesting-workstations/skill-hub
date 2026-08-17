@@ -83,6 +83,17 @@ type CrawlerConfig struct {
 	OfficialRepos   string `json:"officialRepos"`
 	DefaultQuery    string `json:"defaultQuery"`
 	Enabled         bool   `json:"enabled"`
+	// GitHubTokens GitHub Token 池（逗号分隔多个，自动故障切换）。
+	GitHubTokens string `json:"githubTokens"`
+}
+
+// GitHubToken 后台 GitHub Token 池条目（独立表存储，每行一个 token）。
+type GitHubToken struct {
+	ID        string `json:"id"`
+	Token     string `json:"token"` // 完整 token（写入时）；读取时可脱敏
+	Remark    string `json:"remark"`
+	Enabled   bool   `json:"enabled"`
+	CreatedAt string `json:"createdAt"`
 }
 
 // Article 官网文章。

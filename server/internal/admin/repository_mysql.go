@@ -73,6 +73,12 @@ type Repository interface {
 	GetConfig() (domain.CrawlerConfig, error)
 	SaveConfig(c domain.CrawlerConfig) error
 
+	// GitHub Token 池（独立表，每行一个 token）
+	ListGitHubTokens() ([]domain.GitHubToken, error)
+	CreateGitHubToken(t *domain.GitHubToken) error
+	UpdateGitHubToken(id string, fields map[string]any) error
+	DeleteGitHubToken(id string) error
+
 	ListData(f DataFilter) ([]DataItem, error)
 	UpdateDataStatus(id, status string) error
 	UpdateDataStatusBatch(ids []string, status string) error
@@ -263,7 +269,8 @@ func (r *mysqlRepo) migrate() error {
 			max_pages INT NOT NULL DEFAULT 500,
 			official_repos TEXT NOT NULL,
 			default_query VARCHAR(128) NOT NULL DEFAULT 'claude skills',
-			enabled TINYINT(1) NOT NULL DEFAULT 1
+			enabled TINYINT(1) NOT NULL DEFAULT 1,
+			github_tokens TEXT NOT NULL
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 		`CREATE TABLE IF NOT EXISTS articles (
 			id VARCHAR(64) PRIMARY KEY,
@@ -322,6 +329,13 @@ func (r *mysqlRepo) migrate() error {
 			enabled TINYINT(1) NOT NULL DEFAULT 1,
 			created_at VARCHAR(16) NOT NULL DEFAULT ''
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+		`CREATE TABLE IF NOT EXISTS github_tokens (
+			id VARCHAR(64) PRIMARY KEY,
+			token TEXT NOT NULL,
+			remark VARCHAR(255) NOT NULL DEFAULT '',
+			enabled TINYINT(1) NOT NULL DEFAULT 1,
+			created_at VARCHAR(16) NOT NULL DEFAULT ''
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 	}
 	for _, stmt := range stmts {
 		if _, err := r.db.Exec(stmt); err != nil {
@@ -340,7 +354,57 @@ func (r *mysqlRepo) migrate() error {
 	if err := r.ensureLogoURLColumn(); err != nil {
 		return err
 	}
+	if err := r.ensureGitHubTokensColumn(); err != nil {
+		return err
+	}
+	if err := r.migrateLegacyGitHubTokens(); err != nil {
+		return err
+	}
 	return r.ensureArticleContentColumn()
+}
+
+// ensureGitHubTokensColumn 给已存在的 crawler_config 表补充 github_tokens（Token 池）列。
+func (r *mysqlRepo) ensureGitHubTokensColumn() error {
+	if _, err := r.db.Exec(`ALTER TABLE crawler_config ADD COLUMN github_tokens TEXT NOT NULL`); err != nil {
+		if strings.Contains(err.Error(), "Duplicate column") {
+			return nil
+		}
+		return err
+	}
+	return nil
+}
+
+// migrateLegacyGitHubTokens 把旧版 crawler_config.github_tokens（逗号分隔）迁移到独立表 github_tokens。
+// 仅当 github_tokens 表为空时执行一次，避免重复导入。
+func (r *mysqlRepo) migrateLegacyGitHubTokens() error {
+	var n int
+	if err := r.db.QueryRow(`SELECT COUNT(*) FROM github_tokens`).Scan(&n); err != nil {
+		return err
+	}
+	if n > 0 {
+		return nil // 已有数据，跳过
+	}
+	var legacy string
+	if err := r.db.QueryRow(`SELECT github_tokens FROM crawler_config WHERE id = 1`).Scan(&legacy); err != nil {
+		// 表不存在或列不存在（旧版本）忽略
+		if strings.Contains(err.Error(), "no such column") || strings.Contains(err.Error(), "Unknown column") {
+			return nil
+		}
+		return err
+	}
+	for _, t := range strings.Split(legacy, ",") {
+		t = strings.TrimSpace(t)
+		if t == "" {
+			continue
+		}
+		if _, err := r.db.Exec(
+			`INSERT INTO github_tokens(id, token, remark, enabled, created_at) VALUES(?, ?, '', 1, ?)`,
+			newID("tok"), t, today(),
+		); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // ensureLogoURLColumn 给已存在的 official_orgs 表补充 logo_url（logo 图片）列。
@@ -492,9 +556,9 @@ func (r *mysqlRepo) seed() error {
 	if cfgCount == 0 {
 		if _, err := r.db.Exec(
 			`INSERT INTO crawler_config(id, concurrency, timeout, retry_count, user_agent,
-				request_interval, max_pages, official_repos, default_query, enabled)
+				request_interval, max_pages, official_repos, default_query, enabled, github_tokens)
 			 VALUES(1, 4, 20, 3, 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) SkillHubBot/1.0',
-				500, 500, 'anthropics/skills,openai/codex,vercel/ai', 'claude skills', 1)`,
+				500, 500, 'anthropics/skills,openai/codex,vercel/ai', 'claude skills', 1, '')`,
 		); err != nil {
 			return err
 		}
@@ -742,10 +806,10 @@ func (r *mysqlRepo) GetConfig() (domain.CrawlerConfig, error) {
 	var c domain.CrawlerConfig
 	var enabled int
 	err := r.db.QueryRow(`SELECT concurrency, timeout, retry_count, user_agent,
-		request_interval, max_pages, official_repos, default_query, enabled
+		request_interval, max_pages, official_repos, default_query, enabled, github_tokens
 		FROM crawler_config WHERE id = 1`).Scan(
 		&c.Concurrency, &c.Timeout, &c.RetryCount, &c.UserAgent,
-		&c.RequestInterval, &c.MaxPagesPerRun, &c.OfficialRepos, &c.DefaultQuery, &enabled)
+		&c.RequestInterval, &c.MaxPagesPerRun, &c.OfficialRepos, &c.DefaultQuery, &enabled, &c.GitHubTokens)
 	c.Enabled = enabled == 1
 	return c, err
 }
@@ -757,10 +821,73 @@ func (r *mysqlRepo) SaveConfig(c domain.CrawlerConfig) error {
 	}
 	_, err := r.db.Exec(
 		`UPDATE crawler_config SET concurrency=?, timeout=?, retry_count=?, user_agent=?,
-			request_interval=?, max_pages=?, official_repos=?, default_query=?, enabled=?
+			request_interval=?, max_pages=?, official_repos=?, default_query=?, enabled=?, github_tokens=?
 		 WHERE id = 1`,
 		c.Concurrency, c.Timeout, c.RetryCount, c.UserAgent,
-		c.RequestInterval, c.MaxPagesPerRun, c.OfficialRepos, c.DefaultQuery, enabled)
+		c.RequestInterval, c.MaxPagesPerRun, c.OfficialRepos, c.DefaultQuery, enabled, c.GitHubTokens)
+	return err
+}
+
+// ---------- GitHub Token 池 ----------
+
+func (r *mysqlRepo) ListGitHubTokens() ([]domain.GitHubToken, error) {
+	rows, err := r.db.Query(`SELECT id, token, remark, enabled, created_at FROM github_tokens ORDER BY enabled DESC, created_at ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []domain.GitHubToken
+	for rows.Next() {
+		var t domain.GitHubToken
+		var enabled int
+		if err := rows.Scan(&t.ID, &t.Token, &t.Remark, &enabled, &t.CreatedAt); err != nil {
+			return nil, err
+		}
+		t.Enabled = enabled == 1
+		out = append(out, t)
+	}
+	return out, rows.Err()
+}
+
+func (r *mysqlRepo) CreateGitHubToken(t *domain.GitHubToken) error {
+	enabled := 0
+	if t.Enabled {
+		enabled = 1
+	}
+	_, err := r.db.Exec(
+		`INSERT INTO github_tokens(id, token, remark, enabled, created_at) VALUES(?, ?, ?, ?, ?)`,
+		t.ID, t.Token, t.Remark, enabled, t.CreatedAt)
+	return err
+}
+
+func (r *mysqlRepo) UpdateGitHubToken(id string, fields map[string]any) error {
+	if len(fields) == 0 {
+		return nil
+	}
+	var sets []string
+	var args []any
+	if v, ok := fields["token"]; ok {
+		sets = append(sets, "token = ?")
+		args = append(args, v)
+	}
+	if v, ok := fields["remark"]; ok {
+		sets = append(sets, "remark = ?")
+		args = append(args, v)
+	}
+	if v, ok := fields["enabled"]; ok {
+		sets = append(sets, "enabled = ?")
+		args = append(args, v)
+	}
+	if len(sets) == 0 {
+		return nil
+	}
+	args = append(args, id)
+	_, err := r.db.Exec(`UPDATE github_tokens SET `+strings.Join(sets, ", ")+` WHERE id = ?`, args...)
+	return err
+}
+
+func (r *mysqlRepo) DeleteGitHubToken(id string) error {
+	_, err := r.db.Exec(`DELETE FROM github_tokens WHERE id = ?`, id)
 	return err
 }
 

@@ -9,7 +9,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -224,7 +223,7 @@ func (h *Handler) fetchSkillFolder(s domain.Skill) (map[string][]byte, bool) {
 	}
 	fullName := parts[0] + "/" + parts[1]
 
-	client := crawler.NewClient(os.Getenv("GITHUB_TOKEN"))
+	client := crawler.NewClientFromEnv()
 	repo, err := client.GetRepo(fullName)
 	if err != nil {
 		return nil, false
