@@ -104,10 +104,17 @@ export default function TokenPoolPage() {
     {
       key: "enabled",
       title: "状态",
-      width: "90px",
+      width: "110px",
       render: (t) => (
-        <span className={`badge ${t.enabled ? "badge-success" : "badge-waiting"}`}>
-          {t.enabled ? "启用" : "停用"}
+        <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <span className={`badge ${t.enabled ? "badge-success" : "badge-waiting"}`}>
+            {t.enabled ? "启用" : "停用"}
+          </span>
+          {t.enabled && t.broken && (
+            <span className="badge badge-danger" title={`预计 ${t.cooldownAt ?? ""} 恢复`}>
+              熔断中
+            </span>
+          )}
         </span>
       ),
     },

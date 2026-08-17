@@ -94,6 +94,9 @@ type GitHubToken struct {
 	Remark    string `json:"remark"`
 	Enabled   bool   `json:"enabled"`
 	CreatedAt string `json:"createdAt"`
+	// Broken 运行时是否被熔断（限流/失效冷却中）；CooldownAt 预计恢复时间。
+	Broken     bool   `json:"broken"`
+	CooldownAt string `json:"cooldownAt"`
 }
 
 // Article 官网文章。

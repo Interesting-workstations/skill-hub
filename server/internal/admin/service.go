@@ -67,6 +67,10 @@ type Service struct {
 	// tokenPool GitHub Token 池（多 token 故障切换）；后台配置变更后刷新。
 	tokenPool *crawler.TokenPool
 
+	// crawlSem 全局爬虫并发信号量：限制同时运行的爬虫任务数，
+	// 避免多个定时任务同时触发打满 GitHub API 配额。
+	crawlSem chan struct{}
+
 	// translator 技能标题/描述的中文翻译器（新爬取数据入库时生成 name_zh / description_zh）
 	translator *translate.Translator
 
@@ -93,6 +97,7 @@ func NewService(repo Repository) *Service {
 		execSubs:      make(map[string]map[chan domain.ExecEvent]struct{}),
 		wsTickets:     make(map[string]wsTicket),
 		execCancels:   make(map[string]context.CancelFunc),
+		crawlSem:      make(chan struct{}, 1), // 同一时间最多 1 个爬虫任务在跑，保护 API 配额
 	}
 	// 从环境变量初始化 token 池（后台配置加载后由 RefreshTokenPool 覆盖）
 	s.client = crawler.NewClientFromEnv()
@@ -188,13 +193,26 @@ func (s *Service) CheckTokens(tokens []string) []crawler.TokenHealth {
 
 // ---------- GitHub Token 池（后台管理） ----------
 
-// ListTokenPool 返回 token 池全部条目（token 脱敏展示，避免后台页面回显明文）。
+// ListTokenPool 返回 token 池全部条目（token 脱敏展示，避免后台页面回显明文），
+// 并附带运行时状态：当前是否被熔断（限流/失效冷却中）。
 func (s *Service) ListTokenPool() ([]domain.GitHubToken, error) {
 	rows, err := s.repo.ListGitHubTokens()
 	if err != nil {
 		return nil, err
 	}
+	// 当前 token 池的运行时熔断状态（原始 token → 状态）
+	states := map[string]crawler.TokenState{}
+	if s.tokenPool != nil {
+		for _, st := range s.tokenPool.States() {
+			states[st.Token] = st
+		}
+	}
 	for i := range rows {
+		// 先用原始 token 匹配熔断状态，再脱敏展示
+		if st, ok := states[rows[i].Token]; ok {
+			rows[i].Broken = st.Broken
+			rows[i].CooldownAt = st.CooldownAt
+		}
 		rows[i].Token = maskSecret(rows[i].Token)
 	}
 	return rows, nil
@@ -827,6 +845,20 @@ func (s *Service) RunTask(id string) (domain.ExecutionRecord, error) {
 			delete(s.execCancels, record.ID)
 			s.mu.Unlock()
 		}()
+		// 全局并发信号量：同一时间只跑 1 个爬虫任务，其余排队等待。
+		// 避免多个定时任务同时触发，瞬间打满 GitHub API 配额导致大面积限流/失败。
+		select {
+		case s.crawlSem <- struct{}{}:
+		case <-ctx.Done():
+			// 等待期间被手动停止
+			_ = s.repo.UpdateExecution(record.ID, map[string]any{
+				"status": domain.TaskStopped, "progress": 100, "end_time": now(),
+				"duration": "已手动停止（排队中）",
+			})
+			_ = s.repo.UpdateTask(task.ID, map[string]any{"status": domain.TaskWaiting})
+			return
+		}
+		defer func() { <-s.crawlSem }()
 		s.executeTask(ctx, client, task.ID, task.Name, task.Query, record.ID)
 	}()
 	return record, nil

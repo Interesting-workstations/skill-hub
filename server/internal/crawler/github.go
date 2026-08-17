@@ -74,6 +74,30 @@ func (p *TokenPool) Tokens() []string {
 	return out
 }
 
+// TokenState 单个 token 的运行时状态（供后台展示熔断/冷却情况）。
+type TokenState struct {
+	Token      string `json:"token"`
+	Broken     bool   `json:"broken"`
+	BrokenTime string `json:"brokenTime"` // 熔断时间（空表示正常）
+	CooldownAt string `json:"cooldownAt"` // 预计恢复时间
+}
+
+// States 返回池中全部 token 的运行时状态（含熔断信息）。
+func (p *TokenPool) States() []TokenState {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	out := make([]TokenState, 0, len(p.entries))
+	for _, e := range p.entries {
+		st := TokenState{Token: e.token, Broken: e.broken}
+		if e.broken {
+			st.BrokenTime = e.brokenAt.Format("15:04:05")
+			st.CooldownAt = e.brokenAt.Add(tokenCooldown).Format("15:04:05")
+		}
+		out = append(out, st)
+	}
+	return out
+}
+
 // Pick 轮询选取一个当前可用（未熔断或已过冷却期）的 token；无可用时返回空串。
 func (p *TokenPool) Pick() string {
 	p.mu.Lock()
@@ -297,7 +321,7 @@ func (c *Client) IsCancelled() bool {
 }
 
 // get 请求 GitHub API。
-// 池模式：轮询选取一个可用 token；若被限流/拒绝（401/403/429），自动标记该 token 熔断并切换下一个；
+// 池模式：轮询选取一个可用 token；若被限流/拒绝（401/429/配额耗尽的 403），自动标记该 token 熔断并切换下一个；
 // 所有 token 都失败后降级为匿名请求重试一次。
 // 单 token 模式：token 被限流/拒绝后熔断，降级匿名重试。
 func (c *Client) get(path string, out any) error {
@@ -305,40 +329,43 @@ func (c *Client) get(path string, out any) error {
 		return c.getWithPool(path, out)
 	}
 	withToken := c.token != "" && !c.tokenBroken
-	status, err := c.doGet(path, c.token, out)
-	if err != nil && withToken &&
-		(status == http.StatusUnauthorized || status == http.StatusForbidden || status == http.StatusTooManyRequests) {
+	_, rateLimited, err := c.doGet(path, c.token, out)
+	if err != nil && withToken && rateLimited {
 		c.tokenBroken = true
-		_, err = c.doGet(path, "", out)
+		_, _, err = c.doGet(path, "", out)
 	}
 	return err
 }
 
-// getWithPool 池模式 GET：轮询尝试可用 token，失败自动切换，全部失败降级匿名。
+// getWithPool 池模式 GET：轮询尝试可用 token，限流类失败自动切换，全部失败降级匿名。
+// 仅对「token 级」失败（401 无效 / 429 限流 / 配额耗尽的 403）熔断该 token；
+// 仓库级 403 / 404 等与 token 无关的错误不熔断，直接返回（避免误伤整个池）。
 func (c *Client) getWithPool(path string, out any) error {
 	var lastErr error
 	triedAny := false
+	tried := map[string]bool{} // 每个 token 每轮只尝试一次，避免同一 token 重复请求
 	for {
 		tok := c.pool.Pick()
-		if tok == "" {
-			break // 无可用 token
+		if tok == "" || tried[tok] {
+			break // 无可用 token 或已全部尝试过
 		}
+		tried[tok] = true
 		triedAny = true
-		status, err := c.doGet(path, tok, out)
+		_, rateLimited, err := c.doGet(path, tok, out)
 		if err == nil {
 			c.pool.MarkOK(tok)
 			return nil
 		}
 		lastErr = err
-		if status == http.StatusUnauthorized || status == http.StatusForbidden || status == http.StatusTooManyRequests {
+		if rateLimited {
 			c.pool.MarkBroken(tok)
-			continue // 换下一个 token
+			continue // token 级失败，换下一个
 		}
-		return err // 非限流类错误（如 404 仓库不存在）直接返回
+		return err // 仓库级 404/403 等，与 token 无关，直接返回
 	}
 	// 池中 token 全部失败 → 匿名重试一次（避免因 token 全失效导致整批失败）
 	if triedAny {
-		if _, err := c.doGet(path, "", out); err == nil {
+		if _, _, err := c.doGet(path, "", out); err == nil {
 			return nil
 		}
 	}
@@ -348,8 +375,10 @@ func (c *Client) getWithPool(path string, out any) error {
 	return fmt.Errorf("GitHub API %s: 无可用 token", path)
 }
 
-// doGet 执行一次 GET 请求（token 为空表示匿名）。返回 HTTP 状态码。
-func (c *Client) doGet(path, token string, out any) (int, error) {
+// doGet 执行一次 GET 请求（token 为空表示匿名）。
+// 返回 (HTTP 状态码, 是否 token 级限流/失效, 错误)。rateLimited=true 表示该 token
+// 被 GitHub 判定无效/限流（应熔断切换），而非仓库本身的问题。
+func (c *Client) doGet(path, token string, out any) (int, bool, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	// 停止信号触发时取消请求上下文（手动停止任务时立即中断正在进行的请求）
@@ -362,7 +391,7 @@ func (c *Client) doGet(path, token string, out any) (int, error) {
 	}()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiBase+path, nil)
 	if err != nil {
-		return 0, err
+		return 0, false, err
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
 	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
@@ -371,16 +400,36 @@ func (c *Client) doGet(path, token string, out any) (int, error) {
 	}
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return 0, err
+		return 0, false, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return resp.StatusCode, fmt.Errorf("GitHub API %s: %s", path, resp.Status)
+		return resp.StatusCode, isTokenLevelFailure(resp), fmt.Errorf("GitHub API %s: %s", path, resp.Status)
 	}
 	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
-		return resp.StatusCode, err
+		return resp.StatusCode, false, err
 	}
-	return resp.StatusCode, nil
+	return resp.StatusCode, false, nil
+}
+
+// isTokenLevelFailure 判断响应是否为「token 级」限流/失效（应熔断该 token 并切换），
+// 还是仓库本身的问题（404 仓库不存在、403 仓库受限等，不应熔断 token）。
+func isTokenLevelFailure(resp *http.Response) bool {
+	switch resp.StatusCode {
+	case http.StatusUnauthorized: // 401：token 无效/过期
+		return true
+	case http.StatusTooManyRequests: // 429：请求限流
+		return true
+	case http.StatusForbidden: // 403：需区分配额耗尽 vs 仓库受限
+		// 主配额耗尽：X-RateLimit-Remaining = 0
+		if resp.Header.Get("X-RateLimit-Remaining") == "0" {
+			return true
+		}
+		// 次级限流：响应体含 "rate limit" 字样
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
+		return strings.Contains(strings.ToLower(string(body)), "rate limit")
+	}
+	return false
 }
 
 // SetOfficialOrgs 注入动态官方组织列表（来自数据库，替换内置默认）。

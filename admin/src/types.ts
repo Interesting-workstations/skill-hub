@@ -154,6 +154,10 @@ export interface GitHubToken {
   remark: string;
   enabled: boolean;
   createdAt: string;
+  /** 运行时是否被熔断（限流/失效冷却中） */
+  broken?: boolean;
+  /** 预计恢复时间 */
+  cooldownAt?: string;
 }
 
 export interface TokenHealth {
