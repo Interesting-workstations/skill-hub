@@ -37,12 +37,20 @@ type OfficialOrg struct {
 // tokenEntry token 池中单个 token 及其健康状态。
 type tokenEntry struct {
 	token    string
-	broken   bool      // 熔断标记：请求被拒绝/限流（401/403/429）
+	broken   bool      // 熔断标记：请求被拒绝/限流
 	brokenAt time.Time // 熔断时间：冷却期后自动恢复重试
+	cooldown time.Duration // 本次熔断的冷却时长（按失败类型区分）
 }
 
-// tokenCooldown 熔断冷却期：被标记坏的 token 冷却到期后自动重新尝试。
-const tokenCooldown = 5 * time.Minute
+// 熔断冷却时长：
+//   - search 限流 / 429 限流：短冷却（配额每分钟重置，1 分钟即可重试）
+//   - token 无效（401）：长冷却（token 真坏了，短时间内重试无意义）
+//   - 配额耗尽 403：中等冷却
+const (
+	tokenCooldown       = 5 * time.Minute // 默认冷却（兼容旧逻辑）
+	tokenCooldownSearch = 1 * time.Minute // search/429 限流：短冷却
+	tokenCooldownInvalid = 30 * time.Minute // token 无效：长冷却
+)
 
 // TokenPool GitHub Token 池：管理多个 token，支持故障切换与健康检查。
 // 线程安全：可被多个 Client/goroutine 共享。
@@ -91,7 +99,7 @@ func (p *TokenPool) States() []TokenState {
 		st := TokenState{Token: e.token, Broken: e.broken}
 		if e.broken {
 			st.BrokenTime = e.brokenAt.Format("15:04:05")
-			st.CooldownAt = e.brokenAt.Add(tokenCooldown).Format("15:04:05")
+			st.CooldownAt = e.brokenAt.Add(e.cooldown).Format("15:04:05")
 		}
 		out = append(out, st)
 	}
@@ -108,7 +116,7 @@ func (p *TokenPool) Pick() string {
 	for i := 0; i < len(p.entries); i++ {
 		idx := (p.next + i) % len(p.entries)
 		e := p.entries[idx]
-		if !e.broken || time.Since(e.brokenAt) > tokenCooldown {
+		if !e.broken || time.Since(e.brokenAt) > e.cooldown {
 			// 冷却到期自动恢复
 			if e.broken {
 				e.broken = false
@@ -127,13 +135,19 @@ func (p *TokenPool) HasAvailable() bool {
 }
 
 // MarkBroken 标记指定 token 熔断（被 GitHub 拒绝/限流），冷却期后自动恢复。
-func (p *TokenPool) MarkBroken(token string) {
+// cooldown 为可选冷却时长：缺省用默认 5 分钟；传入 0 表示使用默认值。
+func (p *TokenPool) MarkBroken(token string, cooldown ...time.Duration) {
+	cd := tokenCooldown
+	if len(cooldown) > 0 && cooldown[0] > 0 {
+		cd = cooldown[0]
+	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	for _, e := range p.entries {
 		if e.token == token {
 			e.broken = true
 			e.brokenAt = time.Now()
+			e.cooldown = cd
 			return
 		}
 	}
@@ -251,6 +265,34 @@ type Client struct {
 	// tokenBroken 熔断标记：单 token 模式被 GitHub 限流/拒绝（401/403/429）后置位，
 	// 后续请求直接以匿名方式发起，避免每个请求都先被 token 拒绝。
 	tokenBroken bool
+
+	// searchMu / lastSearchAt：search 请求限速（GitHub search 配额 30 次/分钟/账号）。
+	searchMu     sync.Mutex
+	lastSearchAt time.Time
+}
+
+// searchInterval search 请求最小间隔：30 次/分钟配额 → 每 2.1 秒一次最保险。
+const searchInterval = 2100 * time.Millisecond
+
+// searchThrottle 限制 search 请求频率：距上次 search 不足间隔时等待。
+// 多个定时任务连续触发时，避免瞬间打满 search 配额导致 token 被熔断。
+func (c *Client) searchThrottle() error {
+	c.searchMu.Lock()
+	wait := searchInterval - time.Since(c.lastSearchAt)
+	if wait > 0 {
+		t := time.NewTimer(wait)
+		c.searchMu.Unlock()
+		select {
+		case <-t.C:
+		case <-c.stopCh:
+			t.Stop()
+			return fmt.Errorf("search 已停止")
+		}
+		c.searchMu.Lock()
+	}
+	c.lastSearchAt = time.Now()
+	c.searchMu.Unlock()
+	return nil
 }
 
 // NewClient 创建客户端；token 为空时以匿名方式请求（速率受限）。
@@ -329,10 +371,10 @@ func (c *Client) get(path string, out any) error {
 		return c.getWithPool(path, out)
 	}
 	withToken := c.token != "" && !c.tokenBroken
-	_, rateLimited, err := c.doGet(path, c.token, out)
+	_, rateLimited, _, err := c.doGet(path, c.token, out)
 	if err != nil && withToken && rateLimited {
 		c.tokenBroken = true
-		_, _, err = c.doGet(path, "", out)
+		_, _, _, err = c.doGet(path, "", out)
 	}
 	return err
 }
@@ -340,6 +382,7 @@ func (c *Client) get(path string, out any) error {
 // getWithPool 池模式 GET：轮询尝试可用 token，限流类失败自动切换，全部失败降级匿名。
 // 仅对「token 级」失败（401 无效 / 429 限流 / 配额耗尽的 403）熔断该 token；
 // 仓库级 403 / 404 等与 token 无关的错误不熔断，直接返回（避免误伤整个池）。
+// search 限流使用短冷却（1 分钟，配额每分钟重置），token 无效使用长冷却（30 分钟）。
 func (c *Client) getWithPool(path string, out any) error {
 	var lastErr error
 	triedAny := false
@@ -351,21 +394,21 @@ func (c *Client) getWithPool(path string, out any) error {
 		}
 		tried[tok] = true
 		triedAny = true
-		_, rateLimited, err := c.doGet(path, tok, out)
+		_, rateLimited, cd, err := c.doGet(path, tok, out)
 		if err == nil {
 			c.pool.MarkOK(tok)
 			return nil
 		}
 		lastErr = err
 		if rateLimited {
-			c.pool.MarkBroken(tok)
+			c.pool.MarkBroken(tok, cd)
 			continue // token 级失败，换下一个
 		}
 		return err // 仓库级 404/403 等，与 token 无关，直接返回
 	}
 	// 池中 token 全部失败 → 匿名重试一次（避免因 token 全失效导致整批失败）
 	if triedAny {
-		if _, _, err := c.doGet(path, "", out); err == nil {
+		if _, _, _, err := c.doGet(path, "", out); err == nil {
 			return nil
 		}
 	}
@@ -376,9 +419,9 @@ func (c *Client) getWithPool(path string, out any) error {
 }
 
 // doGet 执行一次 GET 请求（token 为空表示匿名）。
-// 返回 (HTTP 状态码, 是否 token 级限流/失效, 错误)。rateLimited=true 表示该 token
-// 被 GitHub 判定无效/限流（应熔断切换），而非仓库本身的问题。
-func (c *Client) doGet(path, token string, out any) (int, bool, error) {
+// 返回 (HTTP 状态码, 是否 token 级限流/失效, 建议熔断冷却时长, 错误)。
+// rateLimited=true 表示该 token 被 GitHub 判定无效/限流（应熔断切换），而非仓库本身的问题。
+func (c *Client) doGet(path, token string, out any) (int, bool, time.Duration, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	// 停止信号触发时取消请求上下文（手动停止任务时立即中断正在进行的请求）
@@ -391,7 +434,7 @@ func (c *Client) doGet(path, token string, out any) (int, bool, error) {
 	}()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiBase+path, nil)
 	if err != nil {
-		return 0, false, err
+		return 0, false, 0, err
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
 	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
@@ -400,36 +443,50 @@ func (c *Client) doGet(path, token string, out any) (int, bool, error) {
 	}
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return 0, false, err
+		return 0, false, 0, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return resp.StatusCode, isTokenLevelFailure(resp), fmt.Errorf("GitHub API %s: %s", path, resp.Status)
+		rl, cd := tokenFailureInfo(resp)
+		return resp.StatusCode, rl, cd, fmt.Errorf("GitHub API %s: %s", path, resp.Status)
 	}
 	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
-		return resp.StatusCode, false, err
+		return resp.StatusCode, false, 0, err
 	}
-	return resp.StatusCode, false, nil
+	return resp.StatusCode, false, 0, nil
 }
 
-// isTokenLevelFailure 判断响应是否为「token 级」限流/失效（应熔断该 token 并切换），
+// tokenFailureInfo 判断响应是否为「token 级」限流/失效（应熔断该 token 并切换），
 // 还是仓库本身的问题（404 仓库不存在、403 仓库受限等，不应熔断 token）。
-func isTokenLevelFailure(resp *http.Response) bool {
+// 返回 (是否应熔断, 建议冷却时长)。search 路径限流用短冷却（配额每分钟重置）。
+func tokenFailureInfo(resp *http.Response) (bool, time.Duration) {
+	isSearch := strings.Contains(resp.Request.URL.Path, "/search/")
 	switch resp.StatusCode {
 	case http.StatusUnauthorized: // 401：token 无效/过期
-		return true
+		return true, tokenCooldownInvalid
 	case http.StatusTooManyRequests: // 429：请求限流
-		return true
+		if isSearch {
+			return true, tokenCooldownSearch
+		}
+		return true, tokenCooldown
 	case http.StatusForbidden: // 403：需区分配额耗尽 vs 仓库受限
 		// 主配额耗尽：X-RateLimit-Remaining = 0
 		if resp.Header.Get("X-RateLimit-Remaining") == "0" {
-			return true
+			if isSearch {
+				return true, tokenCooldownSearch
+			}
+			return true, tokenCooldown
 		}
 		// 次级限流：响应体含 "rate limit" 字样
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
-		return strings.Contains(strings.ToLower(string(body)), "rate limit")
+		if strings.Contains(strings.ToLower(string(body)), "rate limit") {
+			if isSearch {
+				return true, tokenCooldownSearch
+			}
+			return true, tokenCooldown
+		}
 	}
-	return false
+	return false, 0
 }
 
 // SetOfficialOrgs 注入动态官方组织列表（来自数据库，替换内置默认）。
@@ -599,6 +656,7 @@ func (c *Client) avatarLooksReal(avatarURL string) bool {
 // SearchRepos 按关键词搜索仓库。
 // sort 可为 stars/updated/created（空则默认 stars 降序）；
 // 其中 updated 用于“每日最新”场景——按最近更新时间排序抓取最新仓库。
+// 内部带搜索限速（GitHub search 配额 30 次/分钟/账号，多任务连续跑时防止瞬间打满）。
 func (c *Client) SearchRepos(query string, sort string, perPage, page int) ([]Repo, error) {
 	var result struct {
 		Items []Repo `json:"items"`
@@ -608,6 +666,9 @@ func (c *Client) SearchRepos(query string, sort string, perPage, page int) ([]Re
 	}
 	path := fmt.Sprintf("/search/repositories?q=%s&sort=%s&order=desc&per_page=%d&page=%d",
 		url.QueryEscape(query), sort, perPage, page)
+	if err := c.searchThrottle(); err != nil {
+		return nil, err
+	}
 	if err := c.get(path, &result); err != nil {
 		return nil, err
 	}
