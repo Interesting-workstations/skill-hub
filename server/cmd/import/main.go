@@ -26,7 +26,7 @@ import (
 
 func main() {
 	// 加载 .env（MYSQL_DSN 等）
-	if err := config.LoadEnv(".env"); err != nil {
+	if err := config.LoadEnv(config.EnvFile()); err != nil {
 		log.Printf("⚠️ 加载 .env 失败: %v", err)
 	}
 

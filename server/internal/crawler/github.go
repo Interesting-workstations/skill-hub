@@ -42,6 +42,9 @@ type Client struct {
 	// stopCh 停止信号：调用 Cancel() 关闭后，进行中的请求与循环尽快退出（后台手动停止任务用）。
 	stopCh     chan struct{}
 	cancelOnce sync.Once
+	// tokenBroken 熔断标记：token 被 GitHub 限流/拒绝（401/403/429）后置位，
+	// 后续请求直接以匿名方式发起，避免每个请求都先被 token 拒绝。
+	tokenBroken bool
 }
 
 // NewClient 创建客户端；token 为空时以匿名方式请求（速率受限）。
@@ -52,6 +55,12 @@ func NewClient(token string) *Client {
 		officialOrgs: defaultOfficialOrgs,
 		stopCh:       make(chan struct{}),
 	}
+}
+
+// HasToken 是否配置且仍可用的 GitHub Token。匿名模式（无 Token / Token 已熔断）
+// GitHub 限流仅 60 次/小时，调用方应据此跳过高耗配额的自动发现并限制单次抓取量。
+func (c *Client) HasToken() bool {
+	return c.token != "" && !c.tokenBroken
 }
 
 // Cancel 请求停止客户端：关闭停止信号，进行中的 HTTP 请求立即取消。
@@ -70,7 +79,21 @@ func (c *Client) IsCancelled() bool {
 	}
 }
 
+// get 请求 GitHub API。优先使用 token；若 token 被限流/拒绝（401/403/429），
+// 自动熔断降级为匿名请求重试一次，避免因单个 token 异常导致整批爬取全部失败。
 func (c *Client) get(path string, out any) error {
+	withToken := c.token != "" && !c.tokenBroken
+	status, err := c.doGet(path, withToken, out)
+	if err != nil && withToken &&
+		(status == http.StatusUnauthorized || status == http.StatusForbidden || status == http.StatusTooManyRequests) {
+		c.tokenBroken = true
+		_, err = c.doGet(path, false, out)
+	}
+	return err
+}
+
+// doGet 执行一次 GET 请求（withToken 控制是否携带 Authorization 头）。返回 HTTP 状态码。
+func (c *Client) doGet(path string, withToken bool, out any) (int, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	// 停止信号触发时取消请求上下文（手动停止任务时立即中断正在进行的请求）
@@ -83,22 +106,25 @@ func (c *Client) get(path string, out any) error {
 	}()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiBase+path, nil)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
 	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
-	if c.token != "" {
+	if withToken && c.token != "" {
 		req.Header.Set("Authorization", "Bearer "+c.token)
 	}
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("GitHub API %s: %s", path, resp.Status)
+		return resp.StatusCode, fmt.Errorf("GitHub API %s: %s", path, resp.Status)
 	}
-	return json.NewDecoder(resp.Body).Decode(out)
+	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
+		return resp.StatusCode, err
+	}
+	return resp.StatusCode, nil
 }
 
 // SetOfficialOrgs 注入动态官方组织列表（来自数据库，替换内置默认）。
@@ -265,13 +291,18 @@ func (c *Client) avatarLooksReal(avatarURL string) bool {
 	return best*100/total < 95 || second*100/total >= 1
 }
 
-// SearchRepos 按关键词搜索仓库（按 star 排序）。
-func (c *Client) SearchRepos(query string, perPage, page int) ([]Repo, error) {
+// SearchRepos 按关键词搜索仓库。
+// sort 可为 stars/updated/created（空则默认 stars 降序）；
+// 其中 updated 用于“每日最新”场景——按最近更新时间排序抓取最新仓库。
+func (c *Client) SearchRepos(query string, sort string, perPage, page int) ([]Repo, error) {
 	var result struct {
 		Items []Repo `json:"items"`
 	}
-	path := fmt.Sprintf("/search/repositories?q=%s&sort=stars&order=desc&per_page=%d&page=%d",
-		url.QueryEscape(query), perPage, page)
+	if sort == "" {
+		sort = "stars"
+	}
+	path := fmt.Sprintf("/search/repositories?q=%s&sort=%s&order=desc&per_page=%d&page=%d",
+		url.QueryEscape(query), sort, perPage, page)
 	if err := c.get(path, &result); err != nil {
 		return nil, err
 	}

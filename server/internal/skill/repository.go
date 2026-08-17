@@ -5,6 +5,7 @@ package skill
 import (
 	"encoding/json"
 	"os"
+	"strings"
 
 	"github.com/Interesting-workstations/skill-hub/server/internal/domain"
 )
@@ -14,6 +15,9 @@ import (
 type Repository interface {
 	// AllSkills 返回全部技能（精选 + 各分类）。
 	AllSkills() []domain.Skill
+	// SearchSkills 按关键词搜索已发布技能（名称/作者/描述/标签/分类，LIKE 匹配），
+	// 官方优先 + 高星排序，返回 limit 条（支持 offset 分页，避免搜索全量加载）。
+	SearchSkills(query, category, author string, official bool, limit, offset int) []domain.Skill
 	// SkillByID 按 ID 查询已发布技能（官网可见）。
 	SkillByID(id string) (domain.Skill, bool)
 	// SkillByIDAny 按 ID 查询技能（不限状态，供内部查重/管理使用）。
@@ -62,6 +66,60 @@ func (r *memoryRepo) AllSkills() []domain.Skill {
 		skills = append(skills, c.Skills...)
 	}
 	return skills
+}
+
+// SearchSkills 内存实现：仅匹配技能标题（中英文）/作者/标签，支持 offset 分页。
+func (r *memoryRepo) SearchSkills(query, category, author string, official bool, limit, offset int) []domain.Skill {
+	if limit <= 0 || limit > 50 {
+		limit = 20
+	}
+	q := strings.ToLower(strings.TrimSpace(query))
+	out := make([]domain.Skill, 0, limit)
+	for _, sk := range r.AllSkills() {
+		if category != "" && sk.Category != category {
+			continue
+		}
+		if author != "" && !strings.EqualFold(sk.Author, author) {
+			continue
+		}
+		if official && !sk.IsOfficial {
+			continue
+		}
+		if q != "" && !searchMatches(sk, q) {
+			continue
+		}
+		out = append(out, sk)
+		if len(out) >= offset+limit {
+			break
+		}
+	}
+	if offset > 0 {
+		if offset < len(out) {
+			out = out[offset:]
+		} else {
+			out = nil
+		}
+	}
+	return out
+}
+
+// searchMatches 判断技能是否匹配搜索词：仅标题（中英文）/作者/标签。
+func searchMatches(sk domain.Skill, q string) bool {
+	if strings.Contains(strings.ToLower(sk.Name), q) {
+		return true
+	}
+	if strings.Contains(strings.ToLower(sk.NameZh), q) {
+		return true
+	}
+	if strings.Contains(strings.ToLower(sk.Author), q) {
+		return true
+	}
+	for _, tag := range sk.Tags {
+		if strings.Contains(strings.ToLower(tag), q) {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *memoryRepo) SkillByID(id string) (domain.Skill, bool) {

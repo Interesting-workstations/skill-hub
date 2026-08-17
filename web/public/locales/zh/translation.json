@@ -80,7 +80,10 @@
   },
   "category": {
     "skillCount": "共 {n} 个技能",
-    "empty": "该分类暂无技能。"
+    "empty": "该分类暂无技能。",
+    "loadMore": "加载更多",
+    "loading": "加载中…",
+    "end": "— 已全部加载 —"
   },
   "featured": {
     "title": "精选技能",

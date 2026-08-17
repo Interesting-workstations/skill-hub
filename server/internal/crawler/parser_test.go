@@ -21,6 +21,42 @@ Body here`)
 	}
 }
 
+func TestParseSkillMD_BlockScalar(t *testing.T) {
+	// folded 块标量 >-
+	content := []byte(`---
+name: claude-api
+description: >-
+  This skill helps you build LLM-powered
+  applications with Claude. Choose the right
+  surface based on your needs.
+---
+# Claude API`)
+	name, desc := ParseSkillMD(content)
+	if name != "claude-api" {
+		t.Fatalf("期望 name=claude-api，实际 %q", name)
+	}
+	want := "This skill helps you build LLM-powered applications with Claude. Choose the right surface based on your needs."
+	if desc != want {
+		t.Fatalf("期望 desc=%q，实际 %q", want, desc)
+	}
+}
+
+func TestParseSkillMD_LiteralBlockScalar(t *testing.T) {
+	// literal 块标量 |-
+	content := []byte(`---
+name: pptx
+description: |-
+  Use this skill any time a .pptx or .potx
+  file is involved in any way.
+---
+# Pptx`)
+	_, desc := ParseSkillMD(content)
+	want := "Use this skill any time a .pptx or .potx file is involved in any way."
+	if desc != want {
+		t.Fatalf("期望 desc=%q，实际 %q", want, desc)
+	}
+}
+
 func TestParseSkillMD_NoFrontmatter(t *testing.T) {
 	content := []byte("# My Skill\n\nSome description text here.")
 	name, desc := ParseSkillMD(content)

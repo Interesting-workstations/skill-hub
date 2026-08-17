@@ -4,11 +4,14 @@ package admin
 
 import (
 	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
+	"os"
 	"strings"
 	"time"
 
@@ -436,6 +439,19 @@ func (r *mysqlRepo) ensureSkillPathColumn() error {
 	return nil
 }
 
+// randomPassword 生成随机初始密码（首次部署未配置 ADMIN_INIT_PASSWORD 时使用，避免弱密码）。
+func randomPassword(n int) string {
+	const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*"
+	b := make([]byte, n)
+	if _, err := rand.Read(b); err != nil {
+		return "SkillHubInit@2026"
+	}
+	for i := range b {
+		b[i] = chars[int(b[i])%len(chars)]
+	}
+	return string(b)
+}
+
 // seed 初始化后台种子数据（管理员、爬虫配置、SEO、站点、示例任务）。
 func (r *mysqlRepo) seed() error {
 	// 管理员
@@ -444,7 +460,14 @@ func (r *mysqlRepo) seed() error {
 		return err
 	}
 	if n == 0 {
-		hash, err := HashPassword("admin123")
+		// 初始管理员密码：优先环境变量 ADMIN_INIT_PASSWORD，否则生成随机强密码
+		initPwd := os.Getenv("ADMIN_INIT_PASSWORD")
+		generated := false
+		if initPwd == "" {
+			initPwd = randomPassword(16)
+			generated = true
+		}
+		hash, err := HashPassword(initPwd)
 		if err != nil {
 			return err
 		}
@@ -453,6 +476,11 @@ func (r *mysqlRepo) seed() error {
 			"admin", hash, "管理员",
 		); err != nil {
 			return err
+		}
+		if generated {
+			log.Printf("⚠️ 已创建初始管理员 admin，初始密码：%s（请登录后立即修改）", initPwd)
+		} else {
+			log.Printf("⚠️ 已创建初始管理员 admin（密码来自 ADMIN_INIT_PASSWORD 环境变量），请及时修改")
 		}
 	}
 
@@ -501,6 +529,11 @@ func (r *mysqlRepo) seed() error {
 			{ID: "task-2", Name: "社区技能搜索", Type: "skill", Query: "claude skills", Status: domain.TaskSuccess, Schedule: "每小时", LastRunAt: "", RunCount: 132, SuccessCount: 128, FailCount: 4, CreatedAt: "2026-07-05"},
 			{ID: "task-3", Name: "星标榜热更", Type: "info", Query: "agent skills stars:>100", Status: domain.TaskFailed, Schedule: "每 6 小时", LastRunAt: "", RunCount: 58, SuccessCount: 51, FailCount: 7, CreatedAt: "2026-07-10"},
 			{ID: "task-4", Name: "新分类探测", Type: "data", Query: "skillsets", Status: domain.TaskWaiting, Schedule: "手动", RunCount: 0, CreatedAt: "2026-08-11"},
+			{ID: "task-5", Name: "MCP 官方服务器", Type: "skill", Query: "modelcontextprotocol/servers", Status: domain.TaskWaiting, Schedule: "每天 04:00", RunCount: 0, CreatedAt: "2026-08-15 14:30"},
+			{ID: "task-6", Name: "头部公司技能库", Type: "skill", Query: "replicate/skills, SAP/ai-skills-library, databricks-agent-skills, elevenlabs/skills", Status: domain.TaskWaiting, Schedule: "每天 06:00", RunCount: 0, CreatedAt: "2026-08-15 14:30"},
+			{ID: "task-7", Name: "高星技能挖掘", Type: "skill", Query: "claude skills stars:>300", Status: domain.TaskWaiting, Schedule: "每 8 小时", RunCount: 0, CreatedAt: "2026-08-15 14:30"},
+			{ID: "task-8", Name: "MCP 生态搜索", Type: "skill", Query: "mcp server", Status: domain.TaskWaiting, Schedule: "每 12 小时", RunCount: 0, CreatedAt: "2026-08-15 14:30"},
+			{ID: "task-9", Name: "官方 Agent 工具", Type: "skill", Query: "aws/agent-toolkit-for-aws, cloudflare/security-audit-skill, intel/skills", Status: domain.TaskWaiting, Schedule: "每天 08:00", RunCount: 0, CreatedAt: "2026-08-15 14:30"},
 		}
 		for _, t := range tasks {
 			if _, err := r.db.Exec(

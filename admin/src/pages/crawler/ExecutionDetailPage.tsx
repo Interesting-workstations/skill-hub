@@ -4,6 +4,7 @@ import TaskStatus from "../../components/TaskStatus";
 import TaskProgress from "../../components/TaskProgress";
 import ExecutionLog from "../../components/ExecutionLog";
 import { crawlerApi } from "../../api/crawler";
+import { ADMIN_API_BASE } from "../../core/http";
 import type { ExecutionRecord, LogLine } from "../../types";
 
 /** WebSocket 推送事件 */
@@ -61,7 +62,7 @@ export default function ExecutionDetailPage() {
         const { ticket } = await crawlerApi.wsTicket(id!);
         const proto = window.location.protocol === "https:" ? "wss" : "ws";
         ws = new WebSocket(
-          `${proto}://${window.location.host}/api/v1/admin/executions/${id}/ws?ticket=${ticket}`
+          `${proto}://${window.location.host}${ADMIN_API_BASE}/executions/${id}/ws?ticket=${ticket}`
         );
 
         ws.onopen = () => {

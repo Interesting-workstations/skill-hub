@@ -23,7 +23,7 @@ func main() {
 	conc := flag.Int("concurrency", 4, "并发翻译数")
 	flag.Parse()
 
-	_ = config.LoadEnv(".env")
+	_ = config.LoadEnv(config.EnvFile())
 	dsn := getenv("MYSQL_DSN", "root:root@tcp(127.0.0.1:3306)/skillhub?charset=utf8mb4&parseTime=true")
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {

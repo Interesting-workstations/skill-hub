@@ -3,6 +3,7 @@ package crawler
 import (
 	"fmt"
 	"path"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -165,9 +166,27 @@ func (c *Client) crawlRepo(repo Repo) ([]Skill, error) {
 	return skills, nil
 }
 
-// searchReposPaginated 按关键词分页搜索仓库（按 star 降序），直到凑够 limit
+// querySortRe 匹配 query 中的排序标记（如 "agent skills sort:updated"）。
+var querySortRe = regexp.MustCompile(`\bsort:(stars|updated|created)\b`)
+
+// parseQuerySort 从 query 中提取 sort:xxx 标记（如 "agent skills sort:updated"），
+// 返回 (纯净关键词, 排序方式)；无标记时排序为空（默认 stars 降序）。
+func parseQuerySort(query string) (string, string) {
+	sortBy := ""
+	if m := querySortRe.FindStringSubmatch(query); len(m) > 1 {
+		sortBy = m[1]
+		query = querySortRe.ReplaceAllString(query, "")
+		// 折叠移除标记后留下的多余空白
+		query = strings.Join(strings.Fields(query), " ")
+	}
+	return query, sortBy
+}
+
+// searchReposPaginated 按关键词分页搜索仓库，直到凑够 limit
 // 个仓库或没有更多结果为止。GitHub 搜索 API 单页上限 100、总上限 1000 条。
+// query 可带 sort:updated / sort:created / sort:stars 标记控制排序（默认 stars）。
 func (c *Client) searchReposPaginated(query string, perPage, limit int) ([]Repo, error) {
+	query, sortBy := parseQuerySort(query)
 	if perPage <= 0 {
 		perPage = 10
 	}
@@ -180,7 +199,7 @@ func (c *Client) searchReposPaginated(query string, perPage, limit int) ([]Repo,
 		if c.IsCancelled() {
 			return all, nil
 		}
-		batch, err := c.SearchRepos(query, perPage, page)
+		batch, err := c.SearchRepos(query, sortBy, perPage, page)
 		if err != nil {
 			return all, err
 		}
@@ -270,7 +289,7 @@ func (c *Client) buildSkill(repo Repo, skillName, mdPath string) (Skill, error) 
 		Author:         c.OfficialDisplayName(owner),
 		Description:    desc,
 		Tags:           inferTags(name, desc),
-		Category:       inferCategory(name, desc),
+		Category:       InferCategory(name, desc),
 		DownloadURL:    skillDownloadURL(repo, dir),
 		InstallCommand: installCommand(repo.HTMLURL, dir),
 		GithubURL:      repo.HTMLURL,
@@ -420,23 +439,26 @@ func skillDownloadURL(repo Repo, skillPath string) string {
 }
 
 // categoryRules 分类推断规则（按顺序匹配，命中即返回）。
+// 设计原则：具体分类优先（browser/database/document/media/testing/security），
+// creative/productivity 用组合词避免误伤，development 最后兜底。
 var categoryRules = []struct {
 	category string
 	keywords []string
 }{
-	{"browser-automation", []string{"playwright", "selenium", "puppeteer", "web automation", "browser automation", "web scraping", "scraping", "scrape", "headless browser"}},
-	{"database", []string{"database", "sql", "postgres", "mysql", "redis", "mongo", "sqlite", "storage", "data lake", "cassandra"}},
+	{"browser-automation", []string{"playwright", "selenium", "puppeteer", "web automation", "browser automation", "web scraping", "scraping", "headless browser"}},
+	{"database", []string{"database", "sql", "postgres", "mysql", "redis", "mongo", "sqlite", "data lake", "cassandra"}},
 	{"document", []string{"document", "pdf", "word", "excel", "markdown", "office", "spreadsheet", "presentation", "docx", "slide", "google docs"}},
 	{"media", []string{"image", "video", "audio", "media", "photo", "3d", "animation", "music", "voice"}},
-	{"creative", []string{"design", "ui", "ux", "art", "creative", "brand", "logo", "figma", "illustration"}},
-	{"productivity", []string{"productivity", "task", "meeting", "notes", "calendar", "email", "gmail", "notion", "workflow", "schedule", "todo", "reminder", "inbox"}},
-	{"testing", []string{"testing", "test automation", "unit test", "e2e", "end-to-end", "qa", "test coverage", "test suite", "regression"}},
-	{"security", []string{"security", "auth", "encryption", "penetration", "vulnerability", "cyber"}},
+	{"testing", []string{"testing", "test automation", "unit test", "e2e", "end-to-end", "qa", "test coverage", "regression", "test suite"}},
+	{"security", []string{"security", "encryption", "penetration", "vulnerability", "cyber", "authentication", "authorization", "oauth"}},
+	{"creative", []string{"creative", "illustration", "graphic design", "art direction", "logo design", "brand design", "ui design", "ux design", "figma"}},
+	{"productivity", []string{"productivity", "meeting", "notes", "calendar", "email", "gmail", "notion", "todo", "reminder", "inbox", "workflow"}},
 	{"development", []string{"code", "develop", "programming", "git", "github", "api", "backend", "frontend", "engineering", "debug", "refactor", "sdk"}},
 }
 
-// inferCategory 从名称与描述推断技能分类；无法匹配时默认 development。
-func inferCategory(name, desc string) string {
+// InferCategory 从名称与描述推断技能分类；无法匹配时默认 development。
+// 导出供数据迁移命令（cmd/reclassify）对存量数据重新分类。
+func InferCategory(name, desc string) string {
 	text := strings.ToLower(name + " " + desc)
 	for _, rule := range categoryRules {
 		for _, kw := range rule.keywords {

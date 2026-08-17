@@ -22,9 +22,19 @@ export class ApiError extends Error {
   }
 }
 
+/** 后台 API 根路径（含隐藏 secret 前缀，由构建时注入 VITE_ADMIN_SECRET）。
+ *  生产环境访问路径为 /api/v1/<secret>/admin/*，Nginx 反代时剥离 secret 前缀；
+ *  本地开发未注入 secret 时回退 /api/v1/admin（避免双斜杠 /api/v1//admin 导致 301→GET→405）。 */
+const adminSecret = import.meta.env.VITE_ADMIN_SECRET || "";
+export const ADMIN_API_BASE = adminSecret ? `/api/v1/${adminSecret}/admin` : `/api/v1/admin`;
+
 /** 这些路径的 401 不应触发自动续期（自身就是认证流程） */
 function isAuthPath(path: string): boolean {
-  return path.includes("/admin/login") || path.includes("/admin/refresh") || path.includes("/admin/logout");
+  return (
+    path === `${ADMIN_API_BASE}/login` ||
+    path === `${ADMIN_API_BASE}/refresh` ||
+    path === `${ADMIN_API_BASE}/logout`
+  );
 }
 
 /** 全局串行化的刷新锁：并发 401 时只发起一次 refresh */
@@ -36,7 +46,7 @@ async function refreshAccessToken(): Promise<boolean> {
     const refresh = auth.getRefreshToken();
     if (!refresh) return false;
     try {
-      const res = await fetch("/api/v1/admin/refresh", {
+      const res = await fetch(`${ADMIN_API_BASE}/refresh`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ refreshToken: refresh }),
@@ -55,13 +65,16 @@ async function refreshAccessToken(): Promise<boolean> {
   return refreshing;
 }
 
-/** 登录过期：清除凭证并跳转登录页（带 expired 提示） */
+/** 登录过期：清除凭证并跳转登录页（带 expired 提示）
+ *  注意：必须带隐藏路径 basename（/login 无前缀会被 Nginx 404） */
 function forceLogout() {
   auth.clear();
-  const target = `/login?expired=1&redirect=${encodeURIComponent(
+  const base = import.meta.env.VITE_ADMIN_BASE || "";
+  const loginPath = `${base}/login`;
+  const target = `${loginPath}?expired=1&redirect=${encodeURIComponent(
     window.location.pathname + window.location.search
   )}`;
-  if (window.location.pathname !== "/login") {
+  if (window.location.pathname !== loginPath) {
     window.location.assign(target);
   }
 }

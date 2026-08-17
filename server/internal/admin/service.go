@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -77,12 +78,10 @@ type Service struct {
 
 // NewService 创建后台管理服务。
 func NewService(repo Repository) *Service {
-	secret := make([]byte, 32)
-	_, _ = rand.Read(secret)
 	return &Service{
 		repo:          repo,
 		client:        crawler.NewClient(os.Getenv("GITHUB_TOKEN")),
-		token:         secret,
+		token:         adminTokenSecret(),
 		translator:    translate.New(),
 		blacklist:     make(map[string]int64),
 		refreshTokens: make(map[string]refreshEntry),
@@ -92,6 +91,24 @@ func NewService(repo Repository) *Service {
 		wsTickets:     make(map[string]wsTicket),
 		execCancels:   make(map[string]context.CancelFunc),
 	}
+}
+
+// adminTokenSecret 获取持久化的 Access Token 签名密钥。
+// 优先环境变量 ADMIN_TOKEN_SECRET（推荐：重启容器后已签发的 Token 依然有效）；
+// 否则尝试读取 /app/data/.token_secret 文件（进程可写时持久化，避免每次重启随机导致旧 Token 全部失效）；
+// 最后随机生成（仅兜底）。
+func adminTokenSecret() []byte {
+	if env := os.Getenv("ADMIN_TOKEN_SECRET"); len(env) >= 32 {
+		return []byte(env)
+	}
+	const path = "/app/data/.token_secret"
+	if b, err := os.ReadFile(path); err == nil && len(b) >= 32 {
+		return b
+	}
+	b := make([]byte, 32)
+	_, _ = rand.Read(b)
+	_ = os.WriteFile(path, b, 0o600)
+	return b
 }
 
 func now() string   { return time.Now().Format("2006-01-02 15:04:05") }
@@ -676,6 +693,111 @@ func (s *Service) RecoverStaleExecutions() error {
 	return s.repo.RecoverStale()
 }
 
+// ---------- 定时调度器 ----------
+// 根据任务 schedule 字段自动触发执行。支持三种格式：
+//   每天 HH:MM   （如 “每天 03:00”）—— 每天该时刻执行一次
+//   每 N 小时     （如 “每 6 小时”）—— 距上次自动执行满 N 小时再执行
+//   每小时         —— 每小时整点执行一次
+// “手动”或不匹配的 schedule 不会被自动触发（后台仍可手动执行）。
+
+var (
+	dailyRe      = regexp.MustCompile(`每天\s*(\d{1,2}:\d{2})`)
+	everyHoursRe = regexp.MustCompile(`每\s*(\d+)\s*小时`)
+)
+
+// StartScheduler 启动定时调度 goroutine，直到 ctx 取消。
+// lastAuto 记录每个任务上次自动触发时间（进程内存态，重启后清空）。
+func (s *Service) StartScheduler(ctx context.Context) {
+	lastAuto := make(map[string]time.Time)
+	go func() {
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+		log.Println("✅ 定时调度器已启动（每 30 秒检查一次任务计划）")
+		for {
+			select {
+			case <-ctx.Done():
+				log.Println("定时调度器已退出")
+				return
+			case <-ticker.C:
+				s.runDueTasks(lastAuto, time.Now())
+			}
+		}
+	}()
+}
+
+// runDueTasks 检查全部任务，对到期且未在运行的任务发起执行（异步）。
+func (s *Service) runDueTasks(lastAuto map[string]time.Time, now time.Time) {
+	tasks, err := s.repo.ListTasks()
+	if err != nil {
+		return
+	}
+	for _, t := range tasks {
+		if t.Schedule == "" || strings.TrimSpace(t.Schedule) == "手动" {
+			continue
+		}
+		// 正在运行的任务不重复触发
+		if t.Status == domain.TaskRunning {
+			continue
+		}
+		if !taskDue(t.Schedule, lastAuto[t.ID], now) {
+			continue
+		}
+		lastAuto[t.ID] = now
+		go func(id, name string) {
+			if _, err := s.RunTask(id); err != nil {
+				log.Printf("[scheduler] 触发任务 %s(%s) 失败: %v", id, name, err)
+			} else {
+				log.Printf("[scheduler] ✅ 已自动触发定时任务 %s(%s)", id, name)
+			}
+		}(t.ID, t.Name)
+	}
+}
+
+// taskDue 判断任务是否到执行时间。
+// lastAuto 为 0 值表示从未自动执行过（直接到期）；否则按间隔/当日判断。
+func taskDue(schedule string, lastAuto time.Time, now time.Time) bool {
+	sched := strings.TrimSpace(schedule)
+
+	// 每天 HH:MM：当前时间匹配且当天未执行过
+	if m := dailyRe.FindStringSubmatch(sched); len(m) == 2 {
+		hhmm := strings.Split(m[1], ":")
+		if len(hhmm) != 2 {
+			return false
+		}
+		h, _ := strconv.Atoi(hhmm[0])
+		min, _ := strconv.Atoi(hhmm[1])
+		if now.Hour() == h && now.Minute() == min {
+			return lastAuto.IsZero() || !sameDay(lastAuto, now)
+		}
+		return false
+	}
+
+	// 每 N 小时：距上次自动执行满 N 小时
+	if m := everyHoursRe.FindStringSubmatch(sched); len(m) == 2 {
+		n, _ := strconv.Atoi(m[1])
+		if n <= 0 {
+			return false
+		}
+		return lastAuto.IsZero() || now.Sub(lastAuto) >= time.Duration(n)*time.Hour
+	}
+
+	// 每小时：整点且该小时未执行过
+	if sched == "每小时" {
+		if now.Minute() != 0 {
+			return false
+		}
+		return lastAuto.IsZero() || lastAuto.Hour() != now.Hour() || !sameDay(lastAuto, now)
+	}
+	return false
+}
+
+// sameDay 判断两个时间是否同一天。
+func sameDay(a, b time.Time) bool {
+	y1, m1, d1 := a.Date()
+	y2, m2, d2 := b.Date()
+	return y1 == y2 && m1 == m2 && d1 == d2
+}
+
 // executeTask 后台执行爬虫并更新记录与统计，同时通过 WebSocket 实时推送进度与日志。
 func (s *Service) executeTask(ctx context.Context, client *crawler.Client, taskID, taskName, query, execID string) {
 	start := time.Now()
@@ -754,10 +876,15 @@ func (s *Service) executeTask(ctx context.Context, client *crawler.Client, taskI
 	if cfg.MaxPagesPerRun > 0 && cfg.MaxPagesPerRun < limit {
 		limit = cfg.MaxPagesPerRun
 	}
+	// 匿名模式（无 GITHUB_TOKEN）GitHub 限流仅 60 次/小时：把单次抓取量压到 6 个仓库以内，避免耗尽配额
+	if !client.HasToken() && limit > 6 {
+		limit = 6
+	}
 
 	repos := splitRepos(cfg.OfficialRepos)
-	// 自动发现官方组织的技能仓库，与官方组织挂钩（名称含 skill/agent/mcp 优先，否则取高星仓库）
-	if len(orgOwners) > 0 {
+	// 自动发现官方组织的技能仓库（名称含 skill/agent/mcp 优先，否则取高星仓库）。
+	// 匿名模式配额不足（75 组织 × 列表 API 会瞬间打满 60 次/小时），跳过自动发现。
+	if len(orgOwners) > 0 && client.HasToken() {
 		discovered := discoverOfficialRepos(client, orgOwners)
 		if len(discovered) > 0 {
 			repos = append(repos, discovered...)

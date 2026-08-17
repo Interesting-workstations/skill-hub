@@ -6,8 +6,12 @@ export interface SkillSection {
 export interface Skill {
   id: string;
   name: string;
+  /** 中文标题（中英文切换用；为空时回退 name） */
+  nameZh?: string;
   author: string;
   description: string;
+  /** 中文描述（中英文切换用；为空时回退 description） */
+  descriptionZh?: string;
   tags: string[];
   category: string;
   downloadUrl: string;

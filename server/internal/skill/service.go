@@ -28,16 +28,24 @@ func NewService(repo Repository) *Service {
 
 // ListSkills 按筛选条件返回技能列表。
 // filter 为空字段表示不筛选；featured 筛选由精选规则生成；
-// Query 为关键词，匹配名称/作者/描述/标签/分类（不区分大小写）。
+// Query 为关键词，匹配名称/作者/描述/标签/分类（不区分大小写）；
+// Limit/Offset 支持分页（Limit<=0 返回全部）。
 func (s *Service) ListSkills(filter SkillFilter) []domain.Skill {
 	if filter.Featured {
-		return s.filteredFeatured(filter)
+		return paginate(s.filteredFeatured(filter), filter.Limit, filter.Offset)
+	}
+	// 关键词搜索：走 SQL LIKE（相关性排序 + LIMIT/OFFSET 分页），避免全量加载 2000+ 条含 content 的记录
+	if strings.TrimSpace(filter.Query) != "" {
+		limit := filter.Limit
+		if limit <= 0 {
+			limit = 20
+		}
+		return s.repo.SearchSkills(filter.Query, filter.Category, filter.Author, filter.Official, limit, filter.Offset)
 	}
 	all := s.repo.AllSkills()
-	if filter.Category == "" && filter.Author == "" && !filter.Official && filter.Query == "" {
-		return all
+	if filter.Category == "" && filter.Author == "" && !filter.Official {
+		return paginate(all, filter.Limit, filter.Offset)
 	}
-	q := strings.ToLower(strings.TrimSpace(filter.Query))
 	out := make([]domain.Skill, 0, len(all))
 	for _, sk := range all {
 		if filter.Category != "" && sk.Category != filter.Category {
@@ -49,12 +57,28 @@ func (s *Service) ListSkills(filter SkillFilter) []domain.Skill {
 		if filter.Official && !sk.IsOfficial {
 			continue
 		}
-		if q != "" && !skillMatches(sk, q) {
-			continue
-		}
 		out = append(out, sk)
 	}
-	return out
+	return paginate(out, filter.Limit, filter.Offset)
+}
+
+// paginate 对技能列表应用 limit/offset 分页（limit<=0 原样返回）。
+func paginate(list []domain.Skill, limit, offset int) []domain.Skill {
+	if limit <= 0 {
+		return list
+	}
+	start := offset
+	if start < 0 {
+		start = 0
+	}
+	if start >= len(list) {
+		return nil
+	}
+	end := start + limit
+	if end > len(list) {
+		end = len(list)
+	}
+	return list[start:end]
 }
 
 // skillMatches 判断技能是否匹配搜索关键词（名称/作者/描述/标签/分类，不区分大小写）。

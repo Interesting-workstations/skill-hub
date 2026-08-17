@@ -34,7 +34,7 @@ export default function App() {
   return (
     <ToastProvider>
       <AppProvider>
-        <BrowserRouter>
+        <BrowserRouter basename={import.meta.env.VITE_ADMIN_BASE || "/"}>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route

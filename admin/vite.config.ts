@@ -3,6 +3,8 @@ import react from '@vitejs/plugin-react'
 
 // https://vite.dev/config/
 export default defineConfig({
+  // 后台隐藏入口：构建资源挂在 /<ADMIN_BASE>/ 下（由 Dockerfile ARG 注入）
+  base: process.env.ADMIN_BASE || '/',
   plugins: [react()],
   server: {
     port: 5174,

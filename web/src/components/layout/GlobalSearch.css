@@ -113,6 +113,15 @@
   color: var(--color-text-muted);
 }
 
+/* 搜索下拉底部：滚动加载状态区 */
+.global-search-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 4px 0;
+}
+
 .global-search-item {
   display: flex;
   align-items: center;

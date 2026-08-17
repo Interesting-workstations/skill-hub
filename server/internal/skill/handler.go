@@ -63,7 +63,7 @@ func (h *Handler) stats(w http.ResponseWriter, _ *http.Request) {
 	response.OK(w, h.svc.Stats())
 }
 
-// GET /api/v1/skills?category=&author=&official=&featured=&q=
+// GET /api/v1/skills?category=&author=&official=&featured=&q=&limit=&offset=
 func (h *Handler) listSkills(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	official, err1 := strconv.ParseBool(q.Get("official"))
@@ -78,6 +78,17 @@ func (h *Handler) listSkills(w http.ResponseWriter, r *http.Request) {
 	}
 	if err2 == nil {
 		filter.Featured = featured
+	}
+	// 分页参数（limit<=0 返回全部）
+	if v := q.Get("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			filter.Limit = n
+		}
+	}
+	if v := q.Get("offset"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			filter.Offset = n
+		}
 	}
 	response.OK(w, applyLang(h.svc.ListSkills(filter), q.Get("lang")))
 }

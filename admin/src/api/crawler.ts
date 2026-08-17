@@ -1,9 +1,9 @@
 /** 爬虫管理 API —— 对接 skill-hub 后端（/api/v1/admin），数据全部由 Go 提供。 */
 
-import { http } from "../core/http";
+import { http, ADMIN_API_BASE } from "../core/http";
 import type { AdminStats, CrawlTask, CrawlerConfig, ExecutionRecord, FailureRecord, OfficialOrg, OrgVerifyResult } from "../types";
 
-const base = "/api/v1/admin";
+const base = ADMIN_API_BASE;
 
 export const crawlerApi = {
   /** 工作台统计 */

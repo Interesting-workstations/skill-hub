@@ -67,9 +67,17 @@ export default function SkillDetailPage() {
     }
   }, [skillId, skill]);
 
+  // 中英文切换：中文模式优先显示中文标题/描述，英文模式显示原文
+  const displayName = skill ? (lang === "zh" ? skill.nameZh || skill.name : skill.name) : "";
+  const displayDesc = skill
+    ? lang === "zh"
+      ? skill.descriptionZh || skill.description
+      : skill.description
+    : "";
+
   usePageMeta({
-    title: skill ? `${skill.name} — ${t("brand.name")}` : t("brand.title"),
-    description: skill?.description,
+    title: skill ? `${displayName} — ${t("brand.name")}` : t("brand.title"),
+    description: displayDesc || undefined,
   });
 
   if (loading) {
@@ -93,7 +101,7 @@ export default function SkillDetailPage() {
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
           <path d="M5 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
         </svg>
-        <span>{skill.name}</span>
+        <span>{displayName}</span>
       </nav>
 
       <div className="detail-layout">
@@ -104,14 +112,14 @@ export default function SkillDetailPage() {
             <div className="detail-header-top">
               <span className="detail-icon">{skill.isOfficial ? "⭐" : "📦"}</span>
               <div className="detail-meta">
-                <h1>{skill.name}</h1>
+                <h1>{displayName}</h1>
                 <span className="detail-author">
                   {t("detail.authorLabel")}
                   <Link to={`/author/${skill.author.toLowerCase()}`}>{skill.author}</Link>
                 </span>
               </div>
             </div>
-            <MarkdownContent content={skill.description} className="detail-desc" />
+            <MarkdownContent content={displayDesc} className="detail-desc" />
 
             {/* Install command */}
             {skill.installCommand && (

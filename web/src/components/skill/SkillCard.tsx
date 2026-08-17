@@ -8,7 +8,11 @@ import type { Skill } from "../../data/types";
 
 export default function SkillCard({ skill }: { skill: Skill }) {
   const cardRef = useRef<HTMLAnchorElement>(null);
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  // 中英文切换：中文模式优先显示中文标题/描述，英文模式显示原文
+  const displayName = lang === "zh" ? skill.nameZh || skill.name : skill.name;
+  const displayDesc =
+    lang === "zh" ? skill.descriptionZh || skill.description : skill.description;
 
   const handleMouseEnter = () => {
     if (cardRef.current) cardHoverEnter(cardRef.current);
@@ -41,7 +45,7 @@ export default function SkillCard({ skill }: { skill: Skill }) {
           {skill.isOfficial ? "⭐" : "📦"}
         </div>
         <div className="skill-card-meta">
-          <span className="skill-card-name">{skill.name}</span>
+          <span className="skill-card-name">{displayName}</span>
           <span className="skill-card-author">{skill.author}</span>
           {skill.githubStars && (
             <span className="skill-card-stars">
@@ -68,7 +72,7 @@ export default function SkillCard({ skill }: { skill: Skill }) {
           </svg>
         </button>
       </div>
-      <p className="skill-card-desc">{skill.description}</p>
+      <p className="skill-card-desc">{displayDesc}</p>
       <div className="skill-card-tags">
         {skill.tags.map((tag) => (
           <span key={tag} className="skill-tag">

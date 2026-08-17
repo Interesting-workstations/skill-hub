@@ -30,6 +30,27 @@ func TestPickBody(t *testing.T) {
 	}
 }
 
+// TestParseQuerySort 验证 sort:xxx 标记的解析（用于“每日最新”等定时任务）。
+func TestParseQuerySort(t *testing.T) {
+	cases := []struct {
+		in       string
+		wantQ    string
+		wantSort string
+	}{
+		{"agent skills sort:updated", "agent skills", "updated"},
+		{"claude skills sort:created", "claude skills", "created"},
+		{"mcp server sort:stars", "mcp server", "stars"},
+		{"agent skills", "agent skills", ""},
+		{"skills in:name sort:updated extra", "skills in:name extra", "updated"},
+	}
+	for _, c := range cases {
+		q, s := parseQuerySort(c.in)
+		if q != c.wantQ || s != c.wantSort {
+			t.Fatalf("parseQuerySort(%q) = (%q, %q)，期望 (%q, %q)", c.in, q, s, c.wantQ, c.wantSort)
+		}
+	}
+}
+
 // TestSearchReposPaginated 验证分页翻取直到凑够 limit，且不请求多余页。
 func TestSearchReposPaginated(t *testing.T) {
 	var pages atomic.Int32

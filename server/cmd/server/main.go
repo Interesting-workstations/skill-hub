@@ -18,9 +18,9 @@ import (
 )
 
 func main() {
-	// 加载 .env（GITHUB_TOKEN / MYSQL_DSN 等），不覆盖已存在的环境变量
-	if err := config.LoadEnv(".env"); err != nil {
-		log.Printf("⚠️ 加载 .env 失败: %v", err)
+	// 加载环境配置（本地 .env / 线上 .env.prod，由 SKILLHUB_ENV 区分），不覆盖已存在的环境变量
+	if err := config.LoadEnv(config.EnvFile()); err != nil {
+		log.Printf("⚠️ 加载 %s 失败: %v", config.EnvFile(), err)
 	}
 
 	addr := getenv("SERVER_ADDR", ":8080")
@@ -48,6 +48,9 @@ func main() {
 	} else {
 		log.Println("✅ 已清理残留的 running 执行记录/任务")
 	}
+
+	// 启动定时调度器：按任务 schedule 字段自动触发（每天 HH:MM / 每 N 小时 / 每小时）
+	adminSvc.StartScheduler(context.Background())
 
 	srv := &http.Server{
 		Addr:         addr,

@@ -15,18 +15,46 @@ func ParseSkillMD(content []byte) (name, description string) {
 	text := string(content)
 
 	if m := frontmatterRe.FindStringSubmatch(text); len(m) > 1 {
-		for _, line := range strings.Split(m[1], "\n") {
+		lines := strings.Split(m[1], "\n")
+		for i := 0; i < len(lines); i++ {
+			line := lines[i]
 			kv := strings.SplitN(line, ":", 2)
 			if len(kv) != 2 {
 				continue
 			}
-			key := strings.TrimSpace(kv[0])
-			val := strings.Trim(strings.TrimSpace(kv[1]), `"'`)
-			switch strings.ToLower(key) {
-			case "name":
-				name = val
-			case "description":
-				description = val
+			key := strings.ToLower(strings.TrimSpace(kv[0]))
+			val := strings.TrimSpace(kv[1])
+			// YAML 块标量：description: >- / > / | / |- / >+ / |+
+			// 值为标记符时，后续缩进行才是实际内容
+			if key == "name" || key == "description" {
+				if isBlockScalarIndicator(val) {
+					var block []string
+					for j := i + 1; j < len(lines); j++ {
+						next := lines[j]
+						if next == "" || strings.HasPrefix(next, " ") || strings.HasPrefix(next, "\t") {
+							trimmed := strings.TrimSpace(next)
+							if trimmed != "" && !strings.HasPrefix(trimmed, "#") {
+								block = append(block, trimmed)
+							}
+							i = j
+						} else {
+							break
+						}
+					}
+					joined := strings.Join(block, " ")
+					if key == "name" {
+						name = joined
+					} else {
+						description = joined
+					}
+					continue
+				}
+				val = strings.Trim(val, `"'`)
+				if key == "name" {
+					name = val
+				} else {
+					description = val
+				}
 			}
 		}
 	}
@@ -38,6 +66,16 @@ func ParseSkillMD(content []byte) (name, description string) {
 		description = inferDescription(text)
 	}
 	return name, description
+}
+
+// isBlockScalarIndicator 判断是否为 YAML 块标量标记符
+// （| 字面量 / > 折叠，可带 - 去除末尾换行、+ 保留末尾换行）。
+func isBlockScalarIndicator(v string) bool {
+	switch v {
+	case "|", "|-", "|+", ">", ">-", ">+":
+		return true
+	}
+	return false
 }
 
 // inferName 从第一个 # 标题或首个非空文本行推断名称。

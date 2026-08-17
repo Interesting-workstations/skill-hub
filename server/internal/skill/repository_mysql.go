@@ -18,6 +18,10 @@ type mysqlRepo struct {
 	db *sql.DB
 }
 
+// homeCategorySkillLimit 首页/分类索引页每个分类附带的最大技能数（预览区块），
+// 避免一次返回全部技能导致前端渲染卡顿；分类详情页通过 /skills?category=&limit=&offset= 分页加载。
+const homeCategorySkillLimit = 8
+
 // NewMySQLRepository 连接 MySQL 数据库并确保表结构与种子数据就绪。
 // DSN 示例：user:pass@tcp(127.0.0.1:3306)/skillhub?charset=utf8mb4&parseTime=true
 // 目标数据库不存在时自动创建（utf8mb4）。
@@ -303,6 +307,74 @@ func (r *mysqlRepo) AllSkills() []domain.Skill {
 	return skills
 }
 
+// SearchSkills 按关键词 LIKE 搜索已发布技能，仅匹配：技能标题（中英文 name/name_zh）、作者、标签。
+// 相关性排序：标题精确 > 标题前缀 > 作者前缀 > 标签前缀 > 其他子串，再按官方/高星。
+// 支持 limit/offset 分页；相比 AllSkills 全量加载，搜索只查需要的行。
+func (r *mysqlRepo) SearchSkills(query, category, author string, official bool, limit, offset int) []domain.Skill {
+	if limit <= 0 || limit > 50 {
+		limit = 20
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	q := strings.ToLower(strings.TrimSpace(query))
+	like := "%" + q + "%"
+	prefix := q + "%"
+	conds := []string{
+		`data_status = 'published'`,
+		`(LOWER(name) LIKE ? OR LOWER(name_zh) LIKE ? OR LOWER(author) LIKE ? OR LOWER(tags) LIKE ?)`,
+	}
+	args := []any{like, like, like, like}
+	if category != "" {
+		conds = append(conds, `category = ?`)
+		args = append(args, category)
+	}
+	if author != "" {
+		conds = append(conds, `LOWER(author) = LOWER(?)`)
+		args = append(args, author)
+	}
+	if official {
+		conds = append(conds, `is_official = 1`)
+	}
+	// ORDER BY 相关性权重参数：标题精确 / 标题前缀 / 作者前缀 / 标签前缀 / 中文标题前缀 / LIMIT / OFFSET
+	args = append(args, q, prefix, prefix, prefix, prefix, limit, offset)
+	querySQL := `SELECT id, name, name_zh, author, description, description_zh, category,
+		download_url, is_official, is_featured, install_command, github_url,
+		github_stars, license, skill_path, tags, content FROM skills WHERE ` +
+		strings.Join(conds, " AND ") +
+		` ORDER BY
+			CASE
+				WHEN LOWER(name) = ? THEN 0
+				WHEN LOWER(name) LIKE ? THEN 1
+				WHEN LOWER(author) LIKE ? THEN 2
+				WHEN LOWER(tags) LIKE ? THEN 3
+				WHEN LOWER(name_zh) LIKE ? THEN 4
+				ELSE 5
+			END,
+			is_official DESC,
+			CASE
+				WHEN github_stars LIKE '%k' THEN REPLACE(LOWER(github_stars), 'k', '') * 1000
+				WHEN github_stars LIKE '%m' THEN REPLACE(LOWER(github_stars), 'm', '') * 1000000
+				WHEN github_stars IS NULL OR github_stars = '' THEN 0
+				ELSE CAST(github_stars AS UNSIGNED)
+			END DESC,
+			id
+		LIMIT ? OFFSET ?`
+	rows, err := r.db.Query(querySQL, args...)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+
+	skills := make([]domain.Skill, 0, limit)
+	for rows.Next() {
+		if s, ok := scanSkill(rows); ok {
+			skills = append(skills, s)
+		}
+	}
+	return skills
+}
+
 // SkillByID 按 ID 查询已发布技能（未发布的记录官网不可见）。
 func (r *mysqlRepo) SkillByID(id string) (domain.Skill, bool) {
 	row := r.db.QueryRow(`SELECT id, name, name_zh, author, description, description_zh, category,
@@ -356,6 +428,7 @@ func (r *mysqlRepo) AllAuthors() []domain.Author {
 }
 
 // AllCategories 返回全部分类；count 为该分类下已发布技能数（实时统计）。
+// 每个分类只附带前 homeCategorySkillLimit 个技能（首页区块预览），避免全量渲染卡顿。
 func (r *mysqlRepo) AllCategories() []domain.Category {
 	rows, err := r.db.Query(`
 		SELECT c.slug, c.name, COUNT(s.id)
@@ -374,7 +447,7 @@ func (r *mysqlRepo) AllCategories() []domain.Category {
 		if err := rows.Scan(&c.Slug, &c.Name, &c.Count); err != nil {
 			continue
 		}
-		c.Skills = r.skillsByCategory(c.Slug)
+		c.Skills = r.skillsByCategory(c.Slug, homeCategorySkillLimit)
 		categories = append(categories, c)
 	}
 	return categories
@@ -424,9 +497,21 @@ func (r *mysqlRepo) OfficialOrgSummaries() []domain.OfficialOrgSummary {
 	return out
 }
 
-func (r *mysqlRepo) skillsByCategory(slug string) []domain.Skill {
-	rows, err := r.db.Query(`SELECT id, name, name_zh, author, description, description_zh, category, download_url, is_official, is_featured,
-		install_command, github_url, github_stars, license, skill_path, tags, content FROM skills WHERE category = ? AND data_status = 'published'`, slug)
+func (r *mysqlRepo) skillsByCategory(slug string, limit int) []domain.Skill {
+	query := `SELECT id, name, name_zh, author, description, description_zh, category, download_url, is_official, is_featured,
+		install_command, github_url, github_stars, license, skill_path, tags, content FROM skills WHERE category = ? AND data_status = 'published'
+		-- 首页分类区块展示顺序：官方优先，再按星标数降序（k/m 后缀解析为数值）
+		ORDER BY is_official DESC,
+		CASE
+			WHEN github_stars LIKE '%k' THEN REPLACE(LOWER(github_stars), 'k', '') * 1000
+			WHEN github_stars LIKE '%m' THEN REPLACE(LOWER(github_stars), 'm', '') * 1000000
+			WHEN github_stars IS NULL OR github_stars = '' THEN 0
+			ELSE CAST(github_stars AS UNSIGNED)
+		END DESC`
+	if limit > 0 {
+		query += fmt.Sprintf(" LIMIT %d", limit)
+	}
+	rows, err := r.db.Query(query, slug)
 	if err != nil {
 		return nil
 	}
@@ -449,20 +534,48 @@ type rowScanner interface {
 func scanSkill(scanner rowScanner) (domain.Skill, bool) {
 	var s domain.Skill
 	var official, featured int
-	var tagsRaw, contentRaw string
+	var tagsRaw string
+	// description_zh / content 可能是 NULL（旧种子数据），用 NullString 容忍，避免 Scan 报错导致整行丢弃
+	var descZh, contentRaw sql.NullString
 	err := scanner.Scan(
-		&s.ID, &s.Name, &s.NameZh, &s.Author, &s.Description, &s.DescriptionZh, &s.Category,
+		&s.ID, &s.Name, &s.NameZh, &s.Author, &s.Description, &descZh, &s.Category,
 		&s.DownloadURL, &official, &featured, &s.InstallCommand, &s.GithubURL,
 		&s.GithubStars, &s.License, &s.SkillPath, &tagsRaw, &contentRaw,
 	)
 	if err != nil {
 		return domain.Skill{}, false
 	}
+	s.DescriptionZh = descZh.String
 	s.IsOfficial = official == 1
 	s.IsFeatured = featured == 1
+	// 语言归一化：若 description/name 实际是中文（错位存到英文槽位），自动填充到中文字段
+	normalizeSkillLang(&s)
 	_ = json.Unmarshal([]byte(tagsRaw), &s.Tags)
-	_ = json.Unmarshal([]byte(contentRaw), &s.Content)
+	if contentRaw.Valid {
+		_ = json.Unmarshal([]byte(contentRaw.String), &s.Content)
+	}
 	return s, true
+}
+
+// containsChinese 判断字符串是否包含 CJK 中文字符。
+func containsChinese(s string) bool {
+	for _, r := range s {
+		if r >= 0x4e00 && r <= 0x9fff {
+			return true
+		}
+	}
+	return false
+}
+
+// normalizeSkillLang 语言归一化：爬虫/种子数据可能把中文描述错位存到英文槽位（description/name），
+// 这里自动识别并填充到对应中文字段（descriptionZh/nameZh），保证前端中英文切换有数据可用。
+func normalizeSkillLang(s *domain.Skill) {
+	if s.DescriptionZh == "" && containsChinese(s.Description) {
+		s.DescriptionZh = s.Description
+	}
+	if s.NameZh == "" && containsChinese(s.Name) {
+		s.NameZh = s.Name
+	}
 }
 
 func flattenCategorySkills(categories []domain.Category) []domain.Skill {

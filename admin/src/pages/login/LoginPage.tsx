@@ -56,7 +56,7 @@ export default function LoginPage() {
               className="input"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="admin"
+              placeholder="请输入用户名"
               autoFocus
             />
           </div>
@@ -75,9 +75,6 @@ export default function LoginPage() {
             {loading ? "登录中…" : "登 录"}
           </button>
         </form>
-        <div className="login-hint">
-          账号 admin / 密码 admin123（由 Go 后端校验）
-        </div>
       </div>
     </div>
   );

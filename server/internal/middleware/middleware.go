@@ -93,12 +93,22 @@ func Logger(next http.Handler) http.Handler {
 	})
 }
 
-// CORS 允许前端跨域访问（开发环境 5173）。
+// CORS 允许白名单来源跨域访问（仅本地开发端口；生产环境前端与 API 同源，
+// 由 Nginx 反代，无需跨域）。未在白名单的来源不加 CORS 头，浏览器默认拦截。
 func CORS(next http.Handler) http.Handler {
+	allowedOrigins := map[string]bool{
+		"http://localhost:5173": true, // web 开发
+		"http://127.0.0.1:5173": true,
+		"http://localhost:5174": true, // admin 开发
+		"http://127.0.0.1:5174": true,
+	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-Request-ID")
+		if origin := r.Header.Get("Origin"); origin != "" && allowedOrigins[origin] {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Vary", "Origin")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Request-ID")
+		}
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
 			return

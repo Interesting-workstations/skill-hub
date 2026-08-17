@@ -217,6 +217,8 @@ export interface OfficialOrg {
   owner: string;
   displayName: string;
   avatar: string;
+  /** 官网 logo 地址（可为空，后端回退为 GitHub 头像 / 代理） */
+  logoUrl: string;
   sortOrder: number;
   enabled: boolean;
   createdAt: string;

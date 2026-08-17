@@ -9,6 +9,10 @@ export interface SkillQuery {
   featured?: boolean;
   /** 关键词搜索：匹配名称/作者/描述/标签/分类 */
   q?: string;
+  /** 分页：每页数量（不传返回全部） */
+  limit?: number;
+  /** 分页：偏移量 */
+  offset?: number;
 }
 
 /** GET /api/v1/skills */
@@ -19,6 +23,8 @@ export function fetchSkills(query: SkillQuery = {}): Promise<Skill[]> {
   if (query.official) qs.set("official", "true");
   if (query.featured) qs.set("featured", "true");
   if (query.q) qs.set("q", query.q);
+  if (query.limit) qs.set("limit", String(query.limit));
+  if (query.offset) qs.set("offset", String(query.offset));
   const q = qs.toString();
   return request<Skill[]>(`/skills${q ? `?${q}` : ""}`);
 }

@@ -101,8 +101,8 @@ func TestInferCategory(t *testing.T) {
 		{"Generic Tool", "A random utility with no hints", "development"},
 	}
 	for _, c := range cases {
-		if got := inferCategory(c.name, c.desc); got != c.want {
-			t.Fatalf("inferCategory(%q, %q) = %q，期望 %q", c.name, c.desc, got, c.want)
+		if got := InferCategory(c.name, c.desc); got != c.want {
+			t.Fatalf("InferCategory(%q, %q) = %q，期望 %q", c.name, c.desc, got, c.want)
 		}
 	}
 }

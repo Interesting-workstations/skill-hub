@@ -49,3 +49,15 @@ func EnvOr(key, fallback string) string {
 	}
 	return fallback
 }
+
+// EnvFile 返回当前运行环境对应的 env 文件路径。
+// 通过 SKILLHUB_ENV 环境变量区分：prod/production/1 → .env.prod（线上），
+// 其他（默认，本地开发）→ .env。
+func EnvFile() string {
+	switch strings.ToLower(os.Getenv("SKILLHUB_ENV")) {
+	case "prod", "production", "1":
+		return ".env.prod"
+	default:
+		return ".env"
+	}
+}

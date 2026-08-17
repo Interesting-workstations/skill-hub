@@ -9,6 +9,8 @@ type SkillFilter struct {
 	Official bool
 	Featured bool
 	Query    string
+	Limit    int // 每页数量（<=0 表示不限制，返回全部）
+	Offset   int // 偏移量（用于分页）
 }
 
 // AuthorDetail 作者及其技能（作者详情响应）。

@@ -1,0 +1,7 @@
+.git
+.gitignore
+.env
+data/crawled-skills.json
+Dockerfile
+.dockerignore
+*.log

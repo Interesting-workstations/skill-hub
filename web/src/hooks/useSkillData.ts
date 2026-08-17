@@ -28,14 +28,14 @@ export function useStats(): AsyncState<Stats> {
 }
 
 /**
- * 技能列表（支持筛选）。
+ * 技能列表（支持筛选与分页）。
  * query 传 null 表示不请求（用于数据尚未就绪的场景）。
  */
 export function useSkills(query: SkillQuery | null = {}): AsyncState<Skill[]> {
   const { lang } = useI18n();
   return useAsyncData(
     () => (query ? fetchSkills(query) : Promise.resolve([])),
-    [query?.category, query?.author, query?.official, query?.featured, lang]
+    [query?.category, query?.author, query?.official, query?.featured, query?.q, query?.limit, query?.offset, lang]
   );
 }
 

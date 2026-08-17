@@ -1,0 +1,98 @@
+# skill-hub 生产部署编排（Docker Compose 全容器化）
+#
+# 使用：
+#   cd deploy && cp .env.example .env && vim .env   # 填入 GITHUB_TOKEN 等
+#   ./deploy.sh up                                   # 或 docker compose up -d --build
+#
+# 对外端口：WEB_PORT(默认8080)=官网，ADMIN_PORT(默认8081)=运营后台
+version: "3.9"
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: skillhub-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-skillhub}
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      # $$ 转义 compose 变量，避免与容器内环境变量冲突
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    networks: [skillhub-net]
+
+  server:
+    build:
+      context: ../server
+      dockerfile: Dockerfile
+    image: skillhub-server:latest
+    container_name: skillhub-server
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      TZ: Asia/Shanghai
+      SERVER_ADDR: ":8080"
+      MYSQL_DSN: "root:${MYSQL_ROOT_PASSWORD:-root}@tcp(mysql:3306)/${MYSQL_DATABASE:-skillhub}?charset=utf8mb4&parseTime=true"
+      SEED_PATH: "data/skills.json"
+      GITHUB_TOKEN: "${GITHUB_TOKEN:-}"
+      TRANSLATE_PROVIDER: "${TRANSLATE_PROVIDER:-google}"
+      BAIDU_APPID: "${BAIDU_APPID:-}"
+      BAIDU_KEY: "${BAIDU_KEY:-}"
+      DEEPL_KEY: "${DEEPL_KEY:-}"
+      # admin Token 签名密钥（持久化：重启容器后已签发 Token 依然有效）
+      ADMIN_TOKEN_SECRET: "${ADMIN_TOKEN_SECRET:-}"
+    expose: ["8080"]
+    networks: [skillhub-net]
+
+  web:
+    build:
+      context: ../web
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: /api/v1
+    image: skillhub-web:latest
+    container_name: skillhub-web
+    restart: unless-stopped
+    depends_on: [server]
+    environment:
+      TZ: Asia/Shanghai
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    networks: [skillhub-net]
+
+  admin:
+    build:
+      context: ../admin
+      dockerfile: Dockerfile
+      args:
+        ADMIN_BASE: ${ADMIN_BASE:-_}
+        ADMIN_SECRET: ${ADMIN_SECRET:-_}
+    image: skillhub-admin:latest
+    container_name: skillhub-admin
+    restart: unless-stopped
+    depends_on: [server]
+    environment:
+      TZ: Asia/Shanghai
+      ADMIN_BASE: ${ADMIN_BASE:-_}
+      ADMIN_SECRET: ${ADMIN_SECRET:-_}
+    ports:
+      - "${ADMIN_PORT:-8081}:80"
+    networks: [skillhub-net]
+
+volumes:
+  mysql_data:
+
+networks:
+  skillhub-net:
+    driver: bridge

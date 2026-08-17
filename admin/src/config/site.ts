@@ -6,9 +6,4 @@ export const site = {
   portalUrl: "http://localhost:5173",
   /** 后端 API 前缀（开发环境经 Vite 代理） */
   apiBase: "/api/v1",
-  /** 默认管理员（单管理员模型） */
-  defaultAdmin: {
-    username: "admin",
-    password: "admin123",
-  },
 } as const;

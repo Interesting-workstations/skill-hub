@@ -80,7 +80,10 @@
   },
   "category": {
     "skillCount": "{n} skills in total",
-    "empty": "No skills in this category yet."
+    "empty": "No skills in this category yet.",
+    "loadMore": "Load more",
+    "loading": "Loading…",
+    "end": "— End of list —"
   },
   "featured": {
     "title": "Featured Skills",

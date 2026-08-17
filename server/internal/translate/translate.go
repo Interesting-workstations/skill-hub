@@ -25,11 +25,13 @@ import (
 
 // Translator 文本翻译器。
 type Translator struct {
-	provider string // google / baidu / deepl
+	provider string // google / baidu / deepl / off
 	baiduApp string
 	baiduKey string
 	deeplKey string
 	http     *http.Client
+
+	broken bool // 熔断标记：翻译服务网络不可达时置位，后续跳过翻译直接返回原文
 
 	mu    sync.Mutex
 	cache map[string]string // key: toLang + "|" + text
@@ -50,9 +52,11 @@ func New() *Translator {
 	}
 }
 
-// Enabled 是否启用翻译（google 恒可用，baidu/deepl 需配置 Key）。
+// Enabled 是否启用翻译（off/none 禁用；google 默认启用；baidu/deepl 需配置 Key）。
 func (t *Translator) Enabled() bool {
 	switch t.provider {
+	case "off", "none":
+		return false
 	case "baidu":
 		return t.baiduApp != "" && t.baiduKey != ""
 	case "deepl":
@@ -70,6 +74,10 @@ func (t *Translator) Translate(text, toLang string) string {
 	}
 	key := toLang + "|" + text
 	t.mu.Lock()
+	if t.broken {
+		t.mu.Unlock()
+		return text
+	}
 	if v, ok := t.cache[key]; ok {
 		t.mu.Unlock()
 		return v
@@ -78,7 +86,11 @@ func (t *Translator) Translate(text, toLang string) string {
 
 	out, err := t.translate(text, toLang)
 	if err != nil {
-		// 失败降级：返回原文
+		// 失败降级 + 熔断：翻译服务不可达（如中国大陆访问 Google 被墙）时标记 broken，
+		// 后续批量文本直接返回原文，避免逐条等待 12s 超时导致爬虫"卡在翻译阶段"
+		t.mu.Lock()
+		t.broken = true
+		t.mu.Unlock()
 		return text
 	}
 	t.mu.Lock()
