@@ -1051,6 +1051,11 @@ func (s *Service) executeTask(ctx context.Context, client *crawler.Client, taskI
 	}
 
 	appendLog("info", "开始抓取目标数据")
+	// token 池诊断：确认任务运行时 client 是否有可用 token
+	{
+		toks := s.currentTokens()
+		appendLog("info", fmt.Sprintf("GitHub Token 池：%d 个 token 可用，HasToken=%v", len(toks), client.HasToken()))
+	}
 	// 动态加载官方组织（official_orgs 表）并注入爬虫客户端，识别官方来源无需改代码
 	var orgOwners []string
 	if orgs, err := s.repo.ListOfficialOrgs(); err == nil && len(orgs) > 0 {
