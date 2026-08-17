@@ -18,6 +18,9 @@ RUN apk add --no-cache ca-certificates tzdata \
     && addgroup -S app && adduser -S app -G app
 WORKDIR /app
 COPY --from=builder /out/skillhub-server /app/skillhub-server
+# 线上环境配置：SKILLHUB_ENV=prod 时程序加载 .env.prod（compose 注入的变量优先，不覆盖）
+ENV SKILLHUB_ENV=prod
+COPY .env.prod /app/.env.prod
 # 种子数据（首次启动建库填充）
 COPY data/skills.json /app/data/skills.json
 USER app

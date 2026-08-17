@@ -96,8 +96,32 @@ func NewService(repo Repository) *Service {
 	}
 	// 从环境变量初始化 token 池（后台配置加载后由 RefreshTokenPool 覆盖）
 	s.client = crawler.NewClientFromEnv()
+	// github_tokens 表为空时，把环境变量中的 token 同步入库，便于后台配置页直接展示与管理
+	s.seedTokenPoolFromEnv()
 	s.RefreshTokenPool()
 	return s
+}
+
+// seedTokenPoolFromEnv github_tokens 表为空时，把环境变量（GITHUB_TOKENS / GITHUB_TOKEN）
+// 中的 token 逐条写入独立表（首次启动或从旧版升级时兜底），之后以表为准。
+func (s *Service) seedTokenPoolFromEnv() {
+	rows, err := s.repo.ListGitHubTokens()
+	if err != nil || len(rows) > 0 {
+		return // 表已有数据或读取失败，跳过
+	}
+	for _, t := range crawler.TokensFromEnv() {
+		t = strings.TrimSpace(t)
+		if t == "" {
+			continue
+		}
+		_ = s.repo.CreateGitHubToken(&domain.GitHubToken{
+			ID:        newID("tok"),
+			Token:     t,
+			Remark:    "环境变量初始化",
+			Enabled:   true,
+			CreatedAt: today(),
+		})
+	}
 }
 
 // RefreshTokenPool 从数据库 github_tokens 表刷新 token 池（仅启用项），
