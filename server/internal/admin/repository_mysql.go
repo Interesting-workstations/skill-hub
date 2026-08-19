@@ -1014,7 +1014,8 @@ func (r *mysqlRepo) ListUntranslatedSkills(limit int) ([]domain.TranslationItem,
 		return nil, err
 	}
 	defer rows.Close()
-	var out []domain.TranslationItem
+	// 用 make 初始化保证无数据时返回空数组 [] 而非 null（前端 map 不报错）
+	out := make([]domain.TranslationItem, 0)
 	for rows.Next() {
 		var it domain.TranslationItem
 		var descZh sql.NullString

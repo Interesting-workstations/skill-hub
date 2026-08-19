@@ -191,7 +191,8 @@ export interface TranslationItem {
 export interface ScanResult {
   /** 未汉化总数 */
   total: number;
-  items: TranslationItem[];
+  /** 未汉化列表（后端无数据时可能为 null） */
+  items: TranslationItem[] | null;
 }
 
 /* ---------- 抓取数据（数据管理，来自 Go 后端 skills 表） ---------- */

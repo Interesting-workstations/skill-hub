@@ -18,8 +18,9 @@ export default function TranslatePage() {
     setLoading(true);
     try {
       const res = await crawlerApi.scanUntranslated(200);
-      setItems(res.items);
-      setTotal(res.total);
+      // 后端可能返回 null（无数据），兜底为空数组避免渲染报错
+      setItems(res.items ?? []);
+      setTotal(res.total ?? 0);
     } finally {
       setLoading(false);
     }
