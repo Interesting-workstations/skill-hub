@@ -59,7 +59,7 @@ export default function TranslatePage() {
     {
       key: "name",
       title: "标题",
-      minWidth: "220px",
+      width: "220px",
       render: (it) => (
         <div>
           <div style={{ fontWeight: 500 }}>{it.name}</div>
@@ -84,7 +84,7 @@ export default function TranslatePage() {
     {
       key: "description",
       title: "描述",
-      minWidth: "280px",
+      width: "280px",
       render: (it) => {
         const desc = it.descriptionZh || it.description;
         return (
