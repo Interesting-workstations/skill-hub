@@ -998,13 +998,15 @@ func (r *mysqlRepo) DeleteData(id string) error {
 
 // ListUntranslatedSkills 扫描未汉化技能：标题（name_zh）或描述（description_zh）
 // 任一不含中文（CJK 字符）即视为未汉化。limit<=0 表示不限制。
-// 已翻译过但结果与原文相同（品牌名/专有名词等无需翻译）的字段不再列入。
+// 注意：旧版假翻译可能把英文原文写进 name_zh（如 Homelab Pihole DNS），
+// 这类仍需翻译，因此不做 name_zh==name 排除；纯品牌名（DOCX/PDF 等）
+// 在翻译时若结果无变化由调用方标记跳过。
 // 返回字段含中英文原文与翻译状态，供翻译页面展示与批量翻译。
 func (r *mysqlRepo) ListUntranslatedSkills(limit int) ([]domain.TranslationItem, error) {
 	query := `SELECT id, name, name_zh, author, description, description_zh, category
 		FROM skills
-		WHERE (name_zh = '' OR (name_zh NOT REGEXP '[一-龥]' AND name_zh <> name))
-		   OR (description_zh IS NULL OR description_zh = '' OR (description_zh NOT REGEXP '[一-龥]' AND description_zh <> description))
+		WHERE (name_zh = '' OR name_zh NOT REGEXP '[一-龥]')
+		   OR (description_zh IS NULL OR description_zh = '' OR description_zh NOT REGEXP '[一-龥]')
 		ORDER BY is_official DESC, github_stars DESC, id DESC`
 	if limit > 0 {
 		query += fmt.Sprintf(" LIMIT %d", limit)
@@ -1034,8 +1036,8 @@ func (r *mysqlRepo) ListUntranslatedSkills(limit int) ([]domain.TranslationItem,
 func (r *mysqlRepo) CountUntranslatedSkills() (int, error) {
 	var n int
 	err := r.db.QueryRow(`SELECT COUNT(*) FROM skills
-		WHERE (name_zh = '' OR (name_zh NOT REGEXP '[一-龥]' AND name_zh <> name))
-		   OR (description_zh IS NULL OR description_zh = '' OR (description_zh NOT REGEXP '[一-龥]' AND description_zh <> description))`).Scan(&n)
+		WHERE (name_zh = '' OR name_zh NOT REGEXP '[一-龥]')
+		   OR (description_zh IS NULL OR description_zh = '' OR description_zh NOT REGEXP '[一-龥]')`).Scan(&n)
 	return n, err
 }
 

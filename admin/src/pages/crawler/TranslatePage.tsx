@@ -75,12 +75,15 @@ export default function TranslatePage() {
     {
       key: "titleTranslated",
       title: "标题状态",
-      width: "100px",
-      render: (it) => (
-        <span className={`badge ${it.titleTranslated ? "badge-success" : "badge-warning"}`}>
-          {it.titleTranslated ? "已汉化" : "未汉化"}
-        </span>
-      ),
+      width: "110px",
+      render: (it) => {
+        if (it.titleTranslated) return <span className="badge badge-success">已汉化</span>;
+        // 旧版假翻译写回的原文（nameZh == name）或纯品牌名：标为品牌名
+        if (it.nameZh && it.nameZh.toLowerCase() === it.name.toLowerCase()) {
+          return <span className="badge badge-info">品牌名</span>;
+        }
+        return <span className="badge badge-warning">未汉化</span>;
+      },
     },
     {
       key: "description",
