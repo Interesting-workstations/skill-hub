@@ -31,7 +31,8 @@ type Translator struct {
 	deeplKey string
 	http     *http.Client
 
-	broken bool // 熔断标记：翻译服务网络不可达时置位，后续跳过翻译直接返回原文
+	broken       bool // 熔断标记：翻译服务网络不可达时置位，后续跳过翻译直接返回原文
+	googleBroken bool // Google 不可达标记（中国大陆被墙），避免每次降级都等 12s 超时
 
 	mu    sync.Mutex
 	cache map[string]string // key: toLang + "|" + text
@@ -99,6 +100,32 @@ func (t *Translator) Translate(text, toLang string) string {
 	return out
 }
 
+// TranslateStrict 翻译单段文本，失败返回错误（不静默降级为原文）。
+// 供翻译管理页使用：翻译失败时能明确报错，避免"显示成功但内容未汉化"。
+// 不受 broken 熔断影响（每次真实尝试，管理员可修复配置后重试）。
+func (t *Translator) TranslateStrict(text, toLang string) (string, error) {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return text, nil
+	}
+	key := toLang + "|" + text
+	t.mu.Lock()
+	if v, ok := t.cache[key]; ok {
+		t.mu.Unlock()
+		return v, nil
+	}
+	t.mu.Unlock()
+
+	out, err := t.translate(text, toLang)
+	if err != nil {
+		return text, err
+	}
+	t.mu.Lock()
+	t.cache[key] = out
+	t.mu.Unlock()
+	return out, nil
+}
+
 // TranslateBatch 批量翻译（串行带缓存，避免并发打爆免费接口）。
 func (t *Translator) TranslateBatch(texts []string, toLang string) []string {
 	out := make([]string, len(texts))
@@ -115,14 +142,42 @@ func (t *Translator) translate(text, toLang string) (string, error) {
 		if err == nil {
 			return out, nil
 		}
-		// 百度失败（IP 白名单/签名/配额等）自动降级 Google 免费接口重试
-		return t.google(text, toLang)
+		// 百度失败（IP 白名单/签名/配额等）自动降级 Google 免费接口重试；
+		// 若 Google 已知不可达（被墙）则不再降级，直接返回百度错误避免 12s 超时
+		t.mu.Lock()
+		gBroken := t.googleBroken
+		t.mu.Unlock()
+		if gBroken {
+			return "", err
+		}
+		gout, gerr := t.google(text, toLang)
+		if gerr == nil {
+			return gout, nil
+		}
+		t.mu.Lock()
+		t.googleBroken = true
+		t.mu.Unlock()
+		return "", fmt.Errorf("baidu: %v; google: %v", err, gerr)
 	case "deepl":
 		out, err := t.deepl(text, toLang)
 		if err == nil {
 			return out, nil
 		}
-		return t.google(text, toLang)
+		// deepl 失败同样降级 Google（已知不可达则不再重试）
+		t.mu.Lock()
+		gBroken := t.googleBroken
+		t.mu.Unlock()
+		if gBroken {
+			return "", err
+		}
+		gout, gerr := t.google(text, toLang)
+		if gerr == nil {
+			return gout, nil
+		}
+		t.mu.Lock()
+		t.googleBroken = true
+		t.mu.Unlock()
+		return "", fmt.Errorf("deepl: %v; google: %v", err, gerr)
 	default:
 		return t.google(text, toLang)
 	}

@@ -1380,24 +1380,37 @@ func (s *Service) TranslateAllUntranslated() (int, error) {
 		if containsCJK(it.NameZh) && containsCJK(it.DescriptionZh) {
 			continue
 		}
-		if _, err := s.translateAndSave(&it); err != nil {
+		updated, err := s.translateAndSave(&it)
+		if err != nil {
 			continue // 单条翻译失败不中断批量
 		}
-		done++
+		// 只有翻译后实际产生中文的才算成功（品牌名/无需翻译的不计入）
+		if containsCJK(updated.NameZh) || containsCJK(updated.DescriptionZh) {
+			done++
+		}
 	}
 	return done, nil
 }
 
 // translateAndSave 将条目标题与描述翻译为中文并写库（缺啥补啥，已汉化的字段跳过）。
+// 品牌名/专有名词等翻译后仍是原文（不含中文）的字段，视为"无需翻译"并同样写库标记，
+// 使后续扫描不再把这类条目列为待翻译。
 func (s *Service) translateAndSave(it *domain.TranslationItem) (domain.TranslationItem, error) {
 	nameZh := it.NameZh
 	descZh := it.DescriptionZh
+	var err error
 	// 标题未汉化才翻译；已汉化保留原文，避免覆盖人工修正
 	if !containsCJK(nameZh) && it.Name != "" {
-		nameZh = s.translator.Translate(it.Name, "zh-CN")
+		nameZh, err = s.translator.TranslateStrict(it.Name, "zh-CN")
+		if err != nil {
+			return *it, fmt.Errorf("标题翻译失败: %w", err)
+		}
 	}
 	if !containsCJK(descZh) && it.Description != "" {
-		descZh = s.translator.Translate(it.Description, "zh-CN")
+		descZh, err = s.translator.TranslateStrict(it.Description, "zh-CN")
+		if err != nil {
+			return *it, fmt.Errorf("描述翻译失败: %w", err)
+		}
 	}
 	if nameZh == "" && descZh == "" {
 		return *it, nil
