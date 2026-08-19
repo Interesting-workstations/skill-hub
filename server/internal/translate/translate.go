@@ -223,13 +223,21 @@ func (t *Translator) google(text, toLang string) (string, error) {
 }
 
 // baidu 通用翻译 API（需 appid + key）。
+// 百度 `to` 参数只接受 zh/en 等简码（不接受 zh-CN），这里做归一化。
 func (t *Translator) baidu(text, toLang string) (string, error) {
 	salt := fmt.Sprintf("%d", time.Now().UnixNano())
 	sign := md5.Sum([]byte(t.baiduApp + text + salt + t.baiduKey))
 	form := url.Values{}
 	form.Set("q", text)
 	form.Set("from", "auto")
-	form.Set("to", toLang)
+	// 归一化语言码：zh-CN → zh（百度不支持带区域后缀）
+	to := toLang
+	if strings.HasPrefix(to, "zh") {
+		to = "zh"
+	} else if strings.HasPrefix(to, "en") {
+		to = "en"
+	}
+	form.Set("to", to)
 	form.Set("appid", t.baiduApp)
 	form.Set("salt", salt)
 	form.Set("sign", hex.EncodeToString(sign[:]))
