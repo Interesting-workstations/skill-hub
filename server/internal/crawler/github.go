@@ -37,8 +37,8 @@ type OfficialOrg struct {
 // tokenEntry token 池中单个 token 及其健康状态。
 type tokenEntry struct {
 	token    string
-	broken   bool      // 熔断标记：请求被拒绝/限流
-	brokenAt time.Time // 熔断时间：冷却期后自动恢复重试
+	broken   bool          // 熔断标记：请求被拒绝/限流
+	brokenAt time.Time     // 熔断时间：冷却期后自动恢复重试
 	cooldown time.Duration // 本次熔断的冷却时长（按失败类型区分）
 }
 
@@ -47,8 +47,8 @@ type tokenEntry struct {
 //   - token 无效（401）：长冷却（token 真坏了，短时间内重试无意义）
 //   - 配额耗尽 403：中等冷却
 const (
-	tokenCooldown       = 5 * time.Minute // 默认冷却（兼容旧逻辑）
-	tokenCooldownSearch = 1 * time.Minute // search/429 限流：短冷却
+	tokenCooldown        = 5 * time.Minute  // 默认冷却（兼容旧逻辑）
+	tokenCooldownSearch  = 1 * time.Minute  // search/429 限流：短冷却
 	tokenCooldownInvalid = 30 * time.Minute // token 无效：长冷却
 )
 

@@ -169,6 +169,31 @@ export interface TokenHealth {
   detail: string;
 }
 
+/* ---------- 翻译管理 ---------- */
+export interface TranslationItem {
+  id: string;
+  /** 英文标题 */
+  name: string;
+  /** 中文标题（空/未翻译） */
+  nameZh: string;
+  author: string;
+  /** 英文描述 */
+  description: string;
+  /** 中文描述（空/未翻译） */
+  descriptionZh: string;
+  category: string;
+  /** 标题是否已汉化 */
+  titleTranslated: boolean;
+  /** 描述是否已汉化 */
+  descTranslated: boolean;
+}
+
+export interface ScanResult {
+  /** 未汉化总数 */
+  total: number;
+  items: TranslationItem[];
+}
+
 /* ---------- 抓取数据（数据管理，来自 Go 后端 skills 表） ---------- */
 export type DataStatus = "pending" | "approved" | "published" | "ignored";
 

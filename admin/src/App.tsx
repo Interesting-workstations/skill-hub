@@ -12,6 +12,7 @@ import FailurePage from "./pages/crawler/FailurePage";
 import ConfigPage from "./pages/crawler/ConfigPage";
 import OfficialOrgsPage from "./pages/crawler/OfficialOrgsPage";
 import TokenPoolPage from "./pages/crawler/TokenPoolPage";
+import TranslatePage from "./pages/crawler/TranslatePage";
 import CrawlerDataPage from "./pages/data/CrawlerDataPage";
 import AuditPage from "./pages/data/AuditPage";
 import ExportPage from "./pages/data/ExportPage";
@@ -53,6 +54,7 @@ export default function App() {
               <Route path="crawler/failures" element={<FailurePage />} />
               <Route path="crawler/config" element={<ConfigPage />} />
               <Route path="crawler/tokens" element={<TokenPoolPage />} />
+              <Route path="crawler/translate" element={<TranslatePage />} />
               <Route path="crawler/official-orgs" element={<OfficialOrgsPage />} />
               <Route path="data/items" element={<CrawlerDataPage />} />
               <Route path="data/audit" element={<AuditPage />} />

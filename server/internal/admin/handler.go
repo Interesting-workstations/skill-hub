@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -67,6 +68,11 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	h.protected(mux, "PUT /api/v1/admin/tokens/{id}", h.updateToken)
 	h.protected(mux, "DELETE /api/v1/admin/tokens/{id}", h.deleteToken)
 	h.protected(mux, "POST /api/v1/admin/tokens/check", h.checkTokens)
+
+	// 翻译管理（扫描未汉化 + 单条/批量翻译）
+	h.protected(mux, "GET /api/v1/admin/translate/scan", h.scanUntranslated)
+	h.protected(mux, "POST /api/v1/admin/translate/{id}", h.translateSkill)
+	h.protected(mux, "POST /api/v1/admin/translate/all", h.translateAll)
 
 	// 官方组织（动态管理）
 	h.protected(mux, "GET /api/v1/admin/official-orgs", h.listOfficialOrgs)
@@ -652,6 +658,45 @@ func (h *Handler) deleteToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	response.OK(w, map[string]string{"message": "已删除"})
+}
+
+// ---------- 翻译管理 ----------
+
+// scanUntranslated 扫描未汉化技能（GET /api/v1/admin/translate/scan）。
+// 可选 query 参数 limit 限制返回条数（默认 200，0=全部）。
+func (h *Handler) scanUntranslated(w http.ResponseWriter, r *http.Request) {
+	limit := 200
+	if v := r.URL.Query().Get("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			limit = n
+		}
+	}
+	items, total, err := h.svc.ScanUntranslated(limit)
+	if err != nil {
+		response.Fail(w, http.StatusInternalServerError, 50001, "系统错误")
+		return
+	}
+	response.OK(w, map[string]any{"total": total, "items": items})
+}
+
+// translateSkill 翻译单条技能（POST /api/v1/admin/translate/{id}）。
+func (h *Handler) translateSkill(w http.ResponseWriter, r *http.Request) {
+	item, err := h.svc.TranslateSkill(r.PathValue("id"))
+	if err != nil {
+		response.Fail(w, http.StatusBadRequest, 40002, err.Error())
+		return
+	}
+	response.OK(w, item)
+}
+
+// translateAll 批量翻译所有未汉化技能（POST /api/v1/admin/translate/all）。
+func (h *Handler) translateAll(w http.ResponseWriter, r *http.Request) {
+	done, err := h.svc.TranslateAllUntranslated()
+	if err != nil {
+		response.Fail(w, http.StatusInternalServerError, 50001, "系统错误")
+		return
+	}
+	response.OK(w, map[string]int{"translated": done})
 }
 
 // ---------- 抓取数据 ----------

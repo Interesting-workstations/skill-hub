@@ -99,6 +99,21 @@ type GitHubToken struct {
 	CooldownAt string `json:"cooldownAt"`
 }
 
+// TranslationItem 翻译管理：待翻译/已翻译的技能条目（标题+描述双字段）。
+type TranslationItem struct {
+	ID            string `json:"id"`
+	Name          string `json:"name"`
+	NameZh        string `json:"nameZh"`
+	Author        string `json:"author"`
+	Description   string `json:"description"`
+	DescriptionZh string `json:"descriptionZh"`
+	Category      string `json:"category"`
+	// TitleTranslated 标题是否已汉化（含中文）。
+	TitleTranslated bool `json:"titleTranslated"`
+	// DescTranslated 描述是否已汉化（含中文）。
+	DescTranslated bool `json:"descTranslated"`
+}
+
 // Article 官网文章。
 type Article struct {
 	ID        string `json:"id"`

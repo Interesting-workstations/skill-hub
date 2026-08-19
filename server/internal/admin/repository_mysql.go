@@ -86,6 +86,11 @@ type Repository interface {
 	AutoAuditPending() (AutoAuditResult, error)
 	PublishAllApproved() (int64, error)
 
+	// 翻译管理：扫描未汉化技能 + 更新翻译结果
+	ListUntranslatedSkills(limit int) ([]domain.TranslationItem, error)
+	CountUntranslatedSkills() (int, error)
+	UpdateSkillTranslation(id, nameZh, descZh string) error
+
 	ListArticles() ([]domain.Article, error)
 	GetArticle(id string) (domain.Article, error)
 	CreateArticle(a *domain.Article) error
@@ -987,6 +992,65 @@ func (r *mysqlRepo) PublishAllApproved() (int64, error) {
 func (r *mysqlRepo) DeleteData(id string) error {
 	_, err := r.db.Exec(`DELETE FROM skills WHERE id = ?`, id)
 	return err
+}
+
+// ---------- 翻译管理 ----------
+
+// ListUntranslatedSkills 扫描未汉化技能：标题（name_zh）或描述（description_zh）
+// 任一不含中文（CJK 字符）即视为未汉化。limit<=0 表示不限制。
+// 返回字段含中英文原文与翻译状态，供翻译页面展示与批量翻译。
+func (r *mysqlRepo) ListUntranslatedSkills(limit int) ([]domain.TranslationItem, error) {
+	query := `SELECT id, name, name_zh, author, description, description_zh, category
+		FROM skills
+		WHERE (name_zh = '' OR name_zh NOT REGEXP '[一-龥]')
+		   OR (description_zh IS NULL OR description_zh = '' OR description_zh NOT REGEXP '[一-龥]')
+		ORDER BY is_official DESC, github_stars DESC, id DESC`
+	if limit > 0 {
+		query += fmt.Sprintf(" LIMIT %d", limit)
+	}
+	rows, err := r.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []domain.TranslationItem
+	for rows.Next() {
+		var it domain.TranslationItem
+		var descZh sql.NullString
+		if err := rows.Scan(&it.ID, &it.Name, &it.NameZh, &it.Author, &it.Description, &descZh, &it.Category); err != nil {
+			return nil, err
+		}
+		it.DescriptionZh = descZh.String
+		it.TitleTranslated = containsCJK(it.NameZh)
+		it.DescTranslated = containsCJK(it.DescriptionZh)
+		out = append(out, it)
+	}
+	return out, rows.Err()
+}
+
+// CountUntranslatedSkills 统计未汉化技能数量。
+func (r *mysqlRepo) CountUntranslatedSkills() (int, error) {
+	var n int
+	err := r.db.QueryRow(`SELECT COUNT(*) FROM skills
+		WHERE (name_zh = '' OR name_zh NOT REGEXP '[一-龥]')
+		   OR (description_zh IS NULL OR description_zh = '' OR description_zh NOT REGEXP '[一-龥]')`).Scan(&n)
+	return n, err
+}
+
+// UpdateSkillTranslation 保存技能的中文标题与描述翻译结果。
+func (r *mysqlRepo) UpdateSkillTranslation(id, nameZh, descZh string) error {
+	_, err := r.db.Exec(`UPDATE skills SET name_zh = ?, description_zh = ? WHERE id = ?`, nameZh, descZh, id)
+	return err
+}
+
+// containsCJK 判断字符串是否包含中文字符（CJK 统一表意文字）。
+func containsCJK(s string) bool {
+	for _, r := range s {
+		if r >= 0x4e00 && r <= 0x9fff {
+			return true
+		}
+	}
+	return false
 }
 
 // AutoAuditPending 机器人自动审核：对待审核技能按规则判定，

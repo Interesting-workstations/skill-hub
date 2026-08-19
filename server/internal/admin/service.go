@@ -1331,6 +1331,87 @@ func (s *Service) SaveConfig(c domain.CrawlerConfig) error {
 	return nil
 }
 
+// ---------- 翻译管理 ----------
+
+// ScanUntranslated 扫描未汉化技能（标题或描述任一不含中文）。
+// 返回列表 + 未汉化总数，供翻译页面展示。
+func (s *Service) ScanUntranslated(limit int) ([]domain.TranslationItem, int, error) {
+	items, err := s.repo.ListUntranslatedSkills(limit)
+	if err != nil {
+		return nil, 0, err
+	}
+	total, err := s.repo.CountUntranslatedSkills()
+	if err != nil {
+		return nil, 0, err
+	}
+	return items, total, nil
+}
+
+// TranslateSkill 翻译单条技能：标题与描述分别翻译为中文并写库。
+// 返回更新后的条目（含翻译前后状态）。
+func (s *Service) TranslateSkill(id string) (domain.TranslationItem, error) {
+	items, err := s.repo.ListUntranslatedSkills(0)
+	if err != nil {
+		return domain.TranslationItem{}, err
+	}
+	var target *domain.TranslationItem
+	for i := range items {
+		if items[i].ID == id {
+			target = &items[i]
+			break
+		}
+	}
+	if target == nil {
+		return domain.TranslationItem{}, fmt.Errorf("技能不存在或已汉化")
+	}
+	return s.translateAndSave(target)
+}
+
+// TranslateAllUntranslated 批量翻译所有未汉化技能（标题+描述），返回翻译成功条数。
+func (s *Service) TranslateAllUntranslated() (int, error) {
+	items, err := s.repo.ListUntranslatedSkills(0)
+	if err != nil {
+		return 0, err
+	}
+	done := 0
+	for i := range items {
+		it := items[i]
+		// 标题与描述都已汉化的跳过（并发/重复扫描兜底）
+		if containsCJK(it.NameZh) && containsCJK(it.DescriptionZh) {
+			continue
+		}
+		if _, err := s.translateAndSave(&it); err != nil {
+			continue // 单条翻译失败不中断批量
+		}
+		done++
+	}
+	return done, nil
+}
+
+// translateAndSave 将条目标题与描述翻译为中文并写库（缺啥补啥，已汉化的字段跳过）。
+func (s *Service) translateAndSave(it *domain.TranslationItem) (domain.TranslationItem, error) {
+	nameZh := it.NameZh
+	descZh := it.DescriptionZh
+	// 标题未汉化才翻译；已汉化保留原文，避免覆盖人工修正
+	if !containsCJK(nameZh) && it.Name != "" {
+		nameZh = s.translator.Translate(it.Name, "zh-CN")
+	}
+	if !containsCJK(descZh) && it.Description != "" {
+		descZh = s.translator.Translate(it.Description, "zh-CN")
+	}
+	if nameZh == "" && descZh == "" {
+		return *it, nil
+	}
+	if err := s.repo.UpdateSkillTranslation(it.ID, nameZh, descZh); err != nil {
+		return *it, err
+	}
+	it.NameZh = nameZh
+	it.DescriptionZh = descZh
+	it.TitleTranslated = containsCJK(nameZh)
+	it.DescTranslated = containsCJK(descZh)
+	return *it, nil
+}
+
 // ---------- 抓取数据（数据审核） ----------
 
 func (s *Service) ListData(f DataFilter) ([]DataItem, error) {

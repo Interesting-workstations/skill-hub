@@ -111,9 +111,18 @@ func (t *Translator) TranslateBatch(texts []string, toLang string) []string {
 func (t *Translator) translate(text, toLang string) (string, error) {
 	switch t.provider {
 	case "baidu":
-		return t.baidu(text, toLang)
+		out, err := t.baidu(text, toLang)
+		if err == nil {
+			return out, nil
+		}
+		// 百度失败（IP 白名单/签名/配额等）自动降级 Google 免费接口重试
+		return t.google(text, toLang)
 	case "deepl":
-		return t.deepl(text, toLang)
+		out, err := t.deepl(text, toLang)
+		if err == nil {
+			return out, nil
+		}
+		return t.google(text, toLang)
 	default:
 		return t.google(text, toLang)
 	}
