@@ -3,7 +3,7 @@ import AppTable, { type Column } from "../../components/AppTable";
 import AppDialog from "../../components/AppDialog";
 import { useToast } from "../../components/Toast";
 import { crawlerApi } from "../../api/crawler";
-import type { OfficialOrg, OrgVerifyResult } from "../../types";
+import type { OfficialOrg, OrgLogoRefreshResult, OrgVerifyResult } from "../../types";
 
 const AVATAR_SUGGESTIONS = ["🅰️", "🤖", "🇬", "☁️", "🐙", "🔵", "🔷", "🟠", "🟢", "🔴", "🐳", "🦊", "🌊", "🐋", "🔥", "⚡"];
 
@@ -24,6 +24,9 @@ export default function OfficialOrgsPage() {
   // GitHub 校验结果（owner → 校验信息）
   const [verifyMap, setVerifyMap] = useState<Record<string, OrgVerifyResult>>({});
   const [verifying, setVerifying] = useState(false);
+  // 重新拉取 logo 图片（本地缓存）
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshResults, setRefreshResults] = useState<OrgLogoRefreshResult[] | null>(null);
   const [page, setPage] = useState(1);
 
   const load = async () => {
@@ -53,6 +56,27 @@ export default function OfficialOrgsPage() {
       // 错误已由全局 Toast 自动提示
     } finally {
       setVerifying(false);
+    }
+  };
+
+  // 重新拉取所有组织 logo 图片到本地缓存（GitHub 图片不稳定时一键刷新）
+  const handleRefreshLogos = async () => {
+    setRefreshing(true);
+    setRefreshResults(null);
+    try {
+      const results = await crawlerApi.refreshOrgLogos();
+      setRefreshResults(results);
+      const ok = results.filter((r) => r.ok).length;
+      const failed = results.filter((r) => !r.ok);
+      if (failed.length > 0) {
+        toast.info(`图片拉取完成：成功 ${ok} 个，失败 ${failed.length} 个`);
+      } else {
+        toast.success(`图片拉取完成：全部 ${ok} 个组织 logo 已缓存到本地`);
+      }
+    } catch {
+      // 错误已由全局 Toast 自动提示
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -108,6 +132,27 @@ export default function OfficialOrgsPage() {
   };
 
   const columns: Column<OfficialOrg>[] = [
+    {
+      key: "logo",
+      title: "Logo",
+      width: "90px",
+      render: (o) => (
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {/* 本地缓存图片（/api/v1/org-logo/{owner}，后端优先读本地文件） */}
+          <img
+            src={`/api/v1/org-logo/${encodeURIComponent(o.owner)}`}
+            alt={o.displayName}
+            style={{ width: 32, height: 32, borderRadius: 6, objectFit: "contain", background: "#f5f6f8" }}
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = "none";
+              const next = (e.target as HTMLImageElement).nextSibling as HTMLElement;
+              if (next) next.style.display = "inline";
+            }}
+          />
+          <span style={{ display: "none" }}>{o.avatar || "🏛️"}</span>
+        </div>
+      ),
+    },
     {
       key: "avatar",
       title: "标识",
@@ -189,9 +234,35 @@ export default function OfficialOrgsPage() {
           <button className="btn" onClick={handleVerify} disabled={verifying}>
             {verifying ? "校验中…" : "🔍 一键校验"}
           </button>
+          <button className="btn" onClick={handleRefreshLogos} disabled={refreshing}>
+            {refreshing ? "拉取中…" : "🔄 重新拉取图片"}
+          </button>
           <button className="btn btn-primary" onClick={openCreate}>+ 新增组织</button>
         </div>
       </div>
+
+      {/* 重新拉取图片结果 */}
+      {refreshResults && refreshResults.length > 0 && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 10 }}>
+            图片拉取结果
+            <span style={{ fontSize: 12, color: "var(--color-text-secondary)", marginLeft: 8 }}>
+              已下载到服务器本地（data/org-logos），前端不再回源 GitHub
+            </span>
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, maxHeight: 180, overflow: "auto" }}>
+            {refreshResults.map((r) => (
+              <span
+                key={r.owner}
+                className={`badge ${r.ok ? "badge-success" : "badge-danger"}`}
+                title={r.error || r.localPath || ""}
+              >
+                {r.ok ? "✓" : "✗"} {r.displayName}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       <AppTable
         columns={columns}

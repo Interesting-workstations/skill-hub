@@ -212,6 +212,12 @@ func (s *Service) ListOfficialOrgs() []domain.OfficialOrgSummary {
 	return s.repo.OfficialOrgSummaries()
 }
 
+// OrgLogoURL 返回官方组织显式锁定的 logo 来源（官网等），未设置时返回空（走 GitHub 头像）。
+// 供 orgLogo 图片接口确定下载来源：优先读本地缓存，无缓存时按该来源下载。
+func (s *Service) OrgLogoURL(owner string) (string, bool) {
+	return s.repo.OfficialOrgLogoURL(owner)
+}
+
 // GetCategory 按 slug 返回分类及其技能。
 func (s *Service) GetCategory(slug string) (domain.Category, bool) {
 	for _, c := range s.repo.AllCategories() {

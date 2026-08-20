@@ -1,3 +1,5 @@
 .env
 # 爬虫生成的临时 JSON 输出（可由 go run ./cmd/crawler 重新生成）
 data/crawled-skills.json
+# 官方组织 logo 本地缓存（GitHub 图片下载到本地，由后台「重新拉取图片」生成）
+data/org-logos/

@@ -84,6 +84,8 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	h.protected(mux, "DELETE /api/v1/admin/official-orgs/{owner}", h.deleteOfficialOrg)
 	// 一键校验：owner 是否为真正的 GitHub 组织（排查个人账号 / 不存在）
 	h.protected(mux, "GET /api/v1/admin/official-orgs/verify", h.verifyOfficialOrgs)
+	// 重新拉取所有组织 logo 图片到本地缓存（GitHub 图片不稳定时一键刷新）
+	h.protected(mux, "POST /api/v1/admin/official-orgs/refresh-logos", h.refreshOrgLogos)
 	h.protected(mux, "GET /api/v1/admin/export", h.exportData)
 
 	// 抓取数据（数据审核）
@@ -350,6 +352,12 @@ func (h *Handler) listOfficialOrgs(w http.ResponseWriter, _ *http.Request) {
 // GET /api/v1/admin/official-orgs/verify —— 一键校验所有官方组织的 GitHub 类型。
 func (h *Handler) verifyOfficialOrgs(w http.ResponseWriter, _ *http.Request) {
 	response.OK(w, h.svc.VerifyOfficialOrgs())
+}
+
+// POST /api/v1/admin/official-orgs/refresh-logos —— 重新拉取所有组织 logo 到本地缓存。
+// GitHub / 官网图片不稳定时一键刷新，前端统一访问本地文件不再回源 GitHub。
+func (h *Handler) refreshOrgLogos(w http.ResponseWriter, _ *http.Request) {
+	response.OK(w, h.svc.RefreshOrgLogos())
 }
 
 // POST /api/v1/admin/official-orgs —— 新增官方组织。

@@ -28,6 +28,9 @@ type Repository interface {
 	AllCategories() []domain.Category
 	// OfficialOrgSummaries 返回官方组织概览（含各组织官方技能数，启用且按排序）。
 	OfficialOrgSummaries() []domain.OfficialOrgSummary
+	// OfficialOrgLogoURL 返回官方组织显式锁定的 logo 来源 URL（官网等），
+	// 未设置（走 GitHub 头像）时返回空串。用于本地图片缓存下载。
+	OfficialOrgLogoURL(owner string) (string, bool)
 
 	// ListArticles 返回全部已发布文章。
 	ListArticles() []domain.Article
@@ -163,10 +166,16 @@ func (r *memoryRepo) OfficialOrgSummaries() []domain.OfficialOrgSummary {
 			Owner:         a.Slug,
 			DisplayName:   a.Name,
 			Avatar:        a.Avatar,
+			LogoURL:       "/org-logo/" + a.Slug, // 本地图片缓存路径
 			OfficialCount: a.OfficialSkills,
 		})
 	}
 	return out
+}
+
+// OfficialOrgLogoURL 内存实现：无独立官方组织表，返回空（走 GitHub 头像）。
+func (r *memoryRepo) OfficialOrgLogoURL(owner string) (string, bool) {
+	return "", false
 }
 
 // ---------- 公开内容（内存实现返回空/默认值） ----------

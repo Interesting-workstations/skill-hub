@@ -309,3 +309,13 @@ export interface OrgVerifyResult {
   avatarOk: boolean;
   logoUrl: string;
 }
+
+/* 官方组织 logo 重新拉取结果（本地缓存） */
+export interface OrgLogoRefreshResult {
+  owner: string;
+  displayName: string;
+  ok: boolean;
+  error?: string;
+  /** 本地缓存文件路径（相对运行目录） */
+  localPath?: string;
+}

@@ -16,6 +16,7 @@ import (
 
 	"github.com/Interesting-workstations/skill-hub/server/internal/crawler"
 	"github.com/Interesting-workstations/skill-hub/server/internal/domain"
+	"github.com/Interesting-workstations/skill-hub/server/internal/orglogo"
 	"github.com/Interesting-workstations/skill-hub/server/internal/response"
 )
 
@@ -321,32 +322,17 @@ func (h *Handler) listOfficialOrgs(w http.ResponseWriter, _ *http.Request) {
 	response.OK(w, h.svc.ListOfficialOrgs())
 }
 
-// GET /api/v1/org-logo/{owner} —— 官方组织 logo 图片代理。
-// 浏览器直接加载 github.com/{owner}.png 会因防盗链（带外部 Referer 返回 406）失败，
-// 改由后端无 Referer 拉取并转发，同时提供缓存。
+// GET /api/v1/org-logo/{owner} —— 官方组织 logo 图片服务。
+// 图片已提前下载到服务器本地（data/org-logos），优先读本地文件（不再实时回源 GitHub，
+// 解决 GitHub 头像/防盗链不稳定问题）；首次未缓存时自动下载并缓存兜底。
 func (h *Handler) orgLogo(w http.ResponseWriter, r *http.Request) {
 	owner := r.PathValue("owner")
 	if owner == "" {
 		response.NotFound(w, "组织不存在")
 		return
 	}
-	resp, err := http.Get("https://github.com/" + url.PathEscape(owner) + ".png")
-	if err != nil {
-		response.NotFound(w, "logo 获取失败")
-		return
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		response.NotFound(w, "logo 不存在")
-		return
-	}
-	if ct := resp.Header.Get("Content-Type"); ct != "" {
-		w.Header().Set("Content-Type", ct)
-	}
-	w.Header().Set("Cache-Control", "public, max-age=86400")
-	if _, err := io.Copy(w, resp.Body); err != nil {
-		return
-	}
+	logoURL, _ := h.svc.OrgLogoURL(owner)
+	orglogo.Serve(w, r, owner, logoURL)
 }
 
 // logoProxyAllowedHosts 官方组织 logo 代理白名单（防 SSRF，仅代理知名品牌来源）。

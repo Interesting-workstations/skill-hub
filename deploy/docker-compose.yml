@@ -54,6 +54,10 @@ services:
       DEEPL_KEY: "${DEEPL_KEY:-}"
       # admin Token 签名密钥（持久化：重启容器后已签发 Token 依然有效）
       ADMIN_TOKEN_SECRET: "${ADMIN_TOKEN_SECRET:-}"
+    volumes:
+      # 官方组织 logo 本地缓存（GitHub 图片不稳定，提前下载到本地供前端访问）
+      # bind mount：可直接把本地下载好的图片放到 deploy/data/org-logos 目录
+      - ./data/org-logos:/app/data/org-logos
     expose: ["8080"]
     networks: [skillhub-net]
 

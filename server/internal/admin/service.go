@@ -20,6 +20,7 @@ import (
 
 	"github.com/Interesting-workstations/skill-hub/server/internal/crawler"
 	"github.com/Interesting-workstations/skill-hub/server/internal/domain"
+	"github.com/Interesting-workstations/skill-hub/server/internal/orglogo"
 	"github.com/Interesting-workstations/skill-hub/server/internal/translate"
 )
 
@@ -802,6 +803,52 @@ func (s *Service) VerifyOfficialOrgs() []domain.OrgVerifyResult {
 	return out
 }
 
+// OrgLogoRefreshResult 单个组织 logo 重新拉取结果。
+type OrgLogoRefreshResult struct {
+	Owner       string `json:"owner"`
+	DisplayName string `json:"displayName"`
+	OK          bool   `json:"ok"`
+	Error       string `json:"error,omitempty"`
+	// LocalPath 本地缓存文件路径（相对运行目录）。
+	LocalPath string `json:"localPath,omitempty"`
+}
+
+// RefreshOrgLogos 重新拉取所有启用官方组织的 logo 图片到本地磁盘缓存。
+// 来源：显式锁定的官网 logo_url 优先，否则回退 GitHub 头像。
+// 并发下载（限流）以缩短耗时，返回每个组织的拉取结果（后台展示）。
+func (s *Service) RefreshOrgLogos() []OrgLogoRefreshResult {
+	orgs, err := s.repo.ListOfficialOrgs()
+	if err != nil {
+		return nil
+	}
+	out := make([]OrgLogoRefreshResult, len(orgs))
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, 4)
+	for i, o := range orgs {
+		if !o.Enabled {
+			out[i] = OrgLogoRefreshResult{Owner: o.Owner, DisplayName: o.DisplayName, OK: true}
+			continue
+		}
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(idx int, o domain.OfficialOrg) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			res := OrgLogoRefreshResult{Owner: o.Owner, DisplayName: o.DisplayName}
+			p, err := orglogo.Fetch(o.Owner, o.LogoURL)
+			if err != nil {
+				res.Error = err.Error()
+			} else {
+				res.OK = true
+				res.LocalPath = p
+			}
+			out[idx] = res
+		}(i, o)
+	}
+	wg.Wait()
+	return out
+}
+
 // usesOfficialLogo 判断组织是否已显式使用官网 logo（非 GitHub 头像）。
 // 这类组织的 GitHub 头像即使无效（默认 identicon）也不再需要关注。
 func usesOfficialLogo(logoURL string) bool {
@@ -1439,11 +1486,11 @@ var providerNames = map[string]string{
 
 // TranslateStatus 翻译器当前状态（后台管理页）。
 type TranslateStatus struct {
-	Providers    []string       `json:"providers"`    // 当前生效通道链（按优先级）
-	Primary      string         `json:"primary"`      // 后台配置的主通道（'' = 环境变量默认）
-	Configured   map[string]bool `json:"configured"`  // 各通道是否已配置密钥
-	LastSuccess  string         `json:"lastSuccess"`  // 最近一次翻译成功的通道
-	Enabled      bool           `json:"enabled"`
+	Providers    []string          `json:"providers"`   // 当前生效通道链（按优先级）
+	Primary      string            `json:"primary"`     // 后台配置的主通道（'' = 环境变量默认）
+	Configured   map[string]bool   `json:"configured"`  // 各通道是否已配置密钥
+	LastSuccess  string            `json:"lastSuccess"` // 最近一次翻译成功的通道
+	Enabled      bool              `json:"enabled"`
 	ProviderName map[string]string `json:"providerName"` // 通道中文名
 }
 

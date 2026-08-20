@@ -33,12 +33,12 @@ type Translator struct {
 	// 依次尝试，当前失败自动降级下一个。
 	providers []string
 
-	baiduApp string
-	baiduKey string
-	deeplKey string
+	baiduApp    string
+	baiduKey    string
+	deeplKey    string
 	txSecretID  string
 	txSecretKey string
-	http     *http.Client
+	http        *http.Client
 
 	broken       bool // 熔断标记：翻译服务网络不可达时置位，后续跳过翻译直接返回原文
 	googleBroken bool // Google 不可达标记（中国大陆被墙），避免每次降级都等 12s 超时

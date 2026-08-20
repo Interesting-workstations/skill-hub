@@ -1,7 +1,7 @@
 /** 爬虫管理 API —— 对接 skill-hub 后端（/api/v1/admin），数据全部由 Go 提供。 */
 
 import { http, ADMIN_API_BASE } from "../core/http";
-import type { AdminStats, CrawlTask, CrawlerConfig, ExecutionRecord, FailureRecord, GitHubToken, OfficialOrg, OrgVerifyResult, ScanResult, TokenHealth, TranslateConfig, TranslateTestResult, TranslationItem } from "../types";
+import type { AdminStats, CrawlTask, CrawlerConfig, ExecutionRecord, FailureRecord, GitHubToken, OfficialOrg, OrgLogoRefreshResult, OrgVerifyResult, ScanResult, TokenHealth, TranslateConfig, TranslateTestResult, TranslationItem } from "../types";
 
 const base = ADMIN_API_BASE;
 
@@ -59,6 +59,11 @@ export const crawlerApi = {
   /** 一键校验所有官方组织的 GitHub 类型与头像有效性 */
   verifyOfficialOrgs(): Promise<OrgVerifyResult[]> {
     return http.get<OrgVerifyResult[]>(`${base}/official-orgs/verify`);
+  },
+
+  /** 重新拉取所有官方组织 logo 图片到本地缓存（GitHub 图片不稳定时一键刷新） */
+  refreshOrgLogos(): Promise<OrgLogoRefreshResult[]> {
+    return http.post<OrgLogoRefreshResult[]>(`${base}/official-orgs/refresh-logos`);
   },
 
   /** 停止任务 */

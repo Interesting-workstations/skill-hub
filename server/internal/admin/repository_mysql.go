@@ -1056,7 +1056,7 @@ func (r *mysqlRepo) UpdateSkillTranslation(id, nameZh, descZh string) error {
 	return err
 }
 
-// GetTranslateProvider 读取后台配置的主翻译通道（'' 表示用环境变量默认）。
+// GetTranslateProvider 读取后台配置的主翻译通道（” 表示用环境变量默认）。
 func (r *mysqlRepo) GetTranslateProvider() (string, error) {
 	var p string
 	err := r.db.QueryRow(`SELECT provider FROM translate_config WHERE id = 1`).Scan(&p)

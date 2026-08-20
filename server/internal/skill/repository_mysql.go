@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"net/url"
 	"os"
 	"strings"
 
@@ -455,7 +454,8 @@ func (r *mysqlRepo) AllCategories() []domain.Category {
 
 // OfficialOrgSummaries 返回官方组织概览：启用中的官方组织及其官方技能数。
 // 官方组织表（official_orgs）为唯一数据源，按展示名去重（如 anthropics/anthropic 归并为 Anthropic）。
-// logo 地址：显式存储的 logo_url 优先（后台可锁定），为空时回退动态生成。
+// logo 统一走本地图片缓存路径 /org-logo/{owner}（图片已提前下载到服务器本地，
+// 前端不再实时回源 GitHub；首次未缓存时后端会自动下载兜底）。
 func (r *mysqlRepo) OfficialOrgSummaries() []domain.OfficialOrgSummary {
 	rows, err := r.db.Query(`
 		SELECT MIN(o.owner), o.display_name, MIN(o.avatar), MIN(o.logo_url),
@@ -481,20 +481,22 @@ func (r *mysqlRepo) OfficialOrgSummaries() []domain.OfficialOrgSummary {
 		if err := rows.Scan(&o.Owner, &o.DisplayName, &o.Avatar, &o.LogoURL, &o.OfficialCount); err != nil {
 			continue
 		}
-		// 未显式锁定 logo 时，回退动态生成（走后端代理 /org-logo）
-		if o.LogoURL == "" {
-			o.LogoURL = "/org-logo/" + o.Owner
-		} else if strings.HasPrefix(o.LogoURL, "https://github.com/") {
-			// 显式锁定的 GitHub 头像转代理路径（绕防盗链，且支持修正后的组织名）
-			name := strings.TrimSuffix(strings.TrimPrefix(o.LogoURL, "https://github.com/"), ".png")
-			o.LogoURL = "/org-logo/" + name
-		} else {
-			// 官网等其他来源的 logo 走通用图片代理（绕 Cloudflare / 防盗链）
-			o.LogoURL = "/img-proxy?url=" + url.QueryEscape(o.LogoURL)
-		}
+		// 统一指向本地图片缓存（orglogo 包首次访问自动下载兜底）
+		o.LogoURL = "/org-logo/" + o.Owner
 		out = append(out, o)
 	}
 	return out
+}
+
+// OfficialOrgLogoURL 查询官方组织显式锁定的 logo 来源 URL（官网等）。
+// 未设置（走 GitHub 头像）时返回空串。
+func (r *mysqlRepo) OfficialOrgLogoURL(owner string) (string, bool) {
+	var logoURL string
+	err := r.db.QueryRow(`SELECT logo_url FROM official_orgs WHERE owner = ? LIMIT 1`, owner).Scan(&logoURL)
+	if err != nil || logoURL == "" {
+		return "", false
+	}
+	return logoURL, true
 }
 
 func (r *mysqlRepo) skillsByCategory(slug string, limit int) []domain.Skill {
