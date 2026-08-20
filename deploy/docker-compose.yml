@@ -46,9 +46,11 @@ services:
       MYSQL_DSN: "root:${MYSQL_ROOT_PASSWORD:-root}@tcp(mysql:3306)/${MYSQL_DATABASE:-skillhub}?charset=utf8mb4&parseTime=true"
       SEED_PATH: "data/skills.json"
       GITHUB_TOKEN: "${GITHUB_TOKEN:-}"
-      TRANSLATE_PROVIDER: "${TRANSLATE_PROVIDER:-google}"
+      TRANSLATE_PROVIDER: "${TRANSLATE_PROVIDER:-auto}"
       BAIDU_APPID: "${BAIDU_APPID:-}"
       BAIDU_KEY: "${BAIDU_KEY:-}"
+      TX_SECRETID: "${TX_SECRETID:-}"
+      TX_SECRETKEY: "${TX_SECRETKEY:-}"
       DEEPL_KEY: "${DEEPL_KEY:-}"
       # admin Token 签名密钥（持久化：重启容器后已签发 Token 依然有效）
       ADMIN_TOKEN_SECRET: "${ADMIN_TOKEN_SECRET:-}"

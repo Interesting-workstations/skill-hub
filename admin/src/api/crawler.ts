@@ -1,7 +1,7 @@
 /** 爬虫管理 API —— 对接 skill-hub 后端（/api/v1/admin），数据全部由 Go 提供。 */
 
 import { http, ADMIN_API_BASE } from "../core/http";
-import type { AdminStats, CrawlTask, CrawlerConfig, ExecutionRecord, FailureRecord, GitHubToken, OfficialOrg, OrgVerifyResult, ScanResult, TokenHealth, TranslationItem } from "../types";
+import type { AdminStats, CrawlTask, CrawlerConfig, ExecutionRecord, FailureRecord, GitHubToken, OfficialOrg, OrgVerifyResult, ScanResult, TokenHealth, TranslateConfig, TranslateTestResult, TranslationItem } from "../types";
 
 const base = ADMIN_API_BASE;
 
@@ -145,5 +145,18 @@ export const crawlerApi = {
   /** 批量翻译所有未汉化技能 */
   translateAll(): Promise<{ translated: number }> {
     return http.post<{ translated: number }>(`${base}/translate/all`);
+  },
+
+  /** 翻译通道配置状态 */
+  getTranslateConfig(): Promise<TranslateConfig> {
+    return http.get<TranslateConfig>(`${base}/translate/config`);
+  },
+  /** 设置主翻译通道（auto/tencent/baidu/google/deepl） */
+  saveTranslateConfig(provider: string): Promise<TranslateConfig> {
+    return http.put<TranslateConfig>(`${base}/translate/config`, { provider });
+  },
+  /** 测试翻译通道连通性（tencent/baidu/google/deepl/all） */
+  testTranslateProvider(provider: string): Promise<{ results: TranslateTestResult[] }> {
+    return http.post<{ results: TranslateTestResult[] }>(`${base}/translate/test`, { provider });
   },
 };

@@ -69,10 +69,13 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	h.protected(mux, "DELETE /api/v1/admin/tokens/{id}", h.deleteToken)
 	h.protected(mux, "POST /api/v1/admin/tokens/check", h.checkTokens)
 
-	// 翻译管理（扫描未汉化 + 单条/批量翻译）
+	// 翻译管理（扫描未汉化 + 单条/批量翻译 + 通道配置/测试）
 	h.protected(mux, "GET /api/v1/admin/translate/scan", h.scanUntranslated)
 	h.protected(mux, "POST /api/v1/admin/translate/{id}", h.translateSkill)
 	h.protected(mux, "POST /api/v1/admin/translate/all", h.translateAll)
+	h.protected(mux, "GET /api/v1/admin/translate/config", h.getTranslateConfig)
+	h.protected(mux, "PUT /api/v1/admin/translate/config", h.saveTranslateConfig)
+	h.protected(mux, "POST /api/v1/admin/translate/test", h.testTranslateProvider)
 
 	// 官方组织（动态管理）
 	h.protected(mux, "GET /api/v1/admin/official-orgs", h.listOfficialOrgs)
@@ -697,6 +700,46 @@ func (h *Handler) translateAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	response.OK(w, map[string]int{"translated": done})
+}
+
+// getTranslateConfig 翻译通道状态（GET /api/v1/admin/translate/config）。
+func (h *Handler) getTranslateConfig(w http.ResponseWriter, _ *http.Request) {
+	response.OK(w, h.svc.GetTranslateStatus())
+}
+
+// saveTranslateConfig 设置主翻译通道（PUT /api/v1/admin/translate/config）。
+// body: {"provider": "auto|tencent|baidu|google|deepl"}
+func (h *Handler) saveTranslateConfig(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Provider string `json:"provider"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.Fail(w, http.StatusBadRequest, 40001, "参数格式错误")
+		return
+	}
+	if err := h.svc.SetTranslateProvider(req.Provider); err != nil {
+		response.Fail(w, http.StatusBadRequest, 40002, err.Error())
+		return
+	}
+	response.OK(w, h.svc.GetTranslateStatus())
+}
+
+// testTranslateProvider 测试翻译通道连通性（POST /api/v1/admin/translate/test）。
+// body: {"provider": "tencent|baidu|google|deepl|all"}
+func (h *Handler) testTranslateProvider(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Provider string `json:"provider"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.Fail(w, http.StatusBadRequest, 40001, "参数格式错误")
+		return
+	}
+	results, err := h.svc.TestTranslateProvider(req.Provider)
+	if err != nil {
+		response.Fail(w, http.StatusBadRequest, 40002, err.Error())
+		return
+	}
+	response.OK(w, map[string]any{"results": results})
 }
 
 // ---------- 抓取数据 ----------

@@ -104,6 +104,8 @@ func NewService(repo Repository) *Service {
 	// github_tokens 表为空时，把环境变量中的 token 同步入库，便于后台配置页直接展示与管理
 	s.seedTokenPoolFromEnv()
 	s.RefreshTokenPool()
+	// 应用后台保存的翻译主通道配置（覆盖环境变量默认）
+	s.applyTranslateProvider()
 	return s
 }
 
@@ -1423,6 +1425,126 @@ func (s *Service) translateAndSave(it *domain.TranslationItem) (domain.Translati
 	it.TitleTranslated = containsCJK(nameZh)
 	it.DescTranslated = containsCJK(descZh)
 	return *it, nil
+}
+
+// ---------- 翻译配置管理 ----------
+
+// provider 中文名映射（后台展示）。
+var providerNames = map[string]string{
+	"tencent": "腾讯云",
+	"baidu":   "百度",
+	"google":  "Google",
+	"deepl":   "DeepL",
+}
+
+// TranslateStatus 翻译器当前状态（后台管理页）。
+type TranslateStatus struct {
+	Providers    []string       `json:"providers"`    // 当前生效通道链（按优先级）
+	Primary      string         `json:"primary"`      // 后台配置的主通道（'' = 环境变量默认）
+	Configured   map[string]bool `json:"configured"`  // 各通道是否已配置密钥
+	LastSuccess  string         `json:"lastSuccess"`  // 最近一次翻译成功的通道
+	Enabled      bool           `json:"enabled"`
+	ProviderName map[string]string `json:"providerName"` // 通道中文名
+}
+
+// applyTranslateProvider 启动时从 DB 读取后台配置的主翻译通道并应用到翻译器。
+func (s *Service) applyTranslateProvider() {
+	p, err := s.repo.GetTranslateProvider()
+	if err != nil || p == "" {
+		return // 未配置或读取失败，沿用环境变量默认
+	}
+	s.setTranslatorProvider(p)
+}
+
+// setTranslatorProvider 把后台主通道配置应用到翻译器（运行时立即生效）。
+// provider=auto 时使用默认优先级（tencent>baidu>google>deepl）。
+func (s *Service) setTranslatorProvider(p string) {
+	p = strings.ToLower(strings.TrimSpace(p))
+	switch p {
+	case "", "auto":
+		// 保持翻译器默认链（New 时已按环境变量+密钥过滤）
+		return
+	case "tencent", "baidu", "google", "deepl":
+		order := []string{p}
+		for _, q := range []string{"tencent", "baidu", "google", "deepl"} {
+			if q != p {
+				order = append(order, q)
+			}
+		}
+		s.translator.SetProviders(order)
+	default:
+		return
+	}
+}
+
+// GetTranslateStatus 返回翻译器当前状态（通道链 / 配置情况 / 最近成功通道）。
+func (s *Service) GetTranslateStatus() TranslateStatus {
+	p, _ := s.repo.GetTranslateProvider()
+	last := s.translator.LastSuccess()
+	return TranslateStatus{
+		Providers:    s.translator.Providers(),
+		Primary:      p,
+		Configured:   s.translator.ProviderStatus(),
+		LastSuccess:  last,
+		Enabled:      s.translator.Enabled(),
+		ProviderName: providerNames,
+	}
+}
+
+// SetTranslateProvider 设置主翻译通道（写库 + 运行时生效）。
+// provider: auto / tencent / baidu / google / deepl
+func (s *Service) SetTranslateProvider(provider string) error {
+	provider = strings.ToLower(strings.TrimSpace(provider))
+	switch provider {
+	case "auto", "tencent", "baidu", "google", "deepl":
+	default:
+		return fmt.Errorf("无效的翻译通道: %s（可选 auto/tencent/baidu/google/deepl）", provider)
+	}
+	if err := s.repo.SaveTranslateProvider(provider); err != nil {
+		return err
+	}
+	s.setTranslatorProvider(provider)
+	return nil
+}
+
+// TestTranslateProvider 测试指定通道的翻译连通性（不改变熔断/缓存状态）。
+// provider=all 时逐个测试全部已配置通道。返回各通道测试结果。
+func (s *Service) TestTranslateProvider(provider string) ([]map[string]any, error) {
+	configured := s.translator.ProviderStatus()
+	var targets []string
+	if provider == "all" || provider == "" {
+		order := []string{"tencent", "baidu", "google", "deepl"}
+		for _, p := range order {
+			if configured[p] {
+				targets = append(targets, p)
+			}
+		}
+	} else {
+		provider = strings.ToLower(strings.TrimSpace(provider))
+		switch provider {
+		case "tencent", "baidu", "google", "deepl":
+			targets = []string{provider}
+		default:
+			return nil, fmt.Errorf("无效的翻译通道: %s", provider)
+		}
+	}
+
+	testText := "Machine Learning Engineering is a collection of curated resources."
+	results := make([]map[string]any, 0, len(targets))
+	for _, p := range targets {
+		res := map[string]any{"provider": p, "name": providerNames[p]}
+		out, elapsed, err := s.translator.TestProvider(p, testText, "zh-CN")
+		if err != nil {
+			res["ok"] = false
+			res["error"] = err.Error()
+		} else {
+			res["ok"] = true
+			res["elapsed"] = elapsed.Round(time.Millisecond).String()
+			res["output"] = out
+		}
+		results = append(results, res)
+	}
+	return results, nil
 }
 
 // ---------- 抓取数据（数据审核） ----------

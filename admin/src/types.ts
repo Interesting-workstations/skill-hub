@@ -195,6 +195,30 @@ export interface ScanResult {
   items: TranslationItem[] | null;
 }
 
+/* ---------- 翻译通道配置 ---------- */
+export interface TranslateConfig {
+  /** 当前生效通道链（按优先级） */
+  providers: string[];
+  /** 后台配置的主通道（'' = 环境变量默认） */
+  primary: string;
+  /** 各通道是否已配置密钥 */
+  configured: Record<string, boolean>;
+  /** 最近一次翻译成功的通道 */
+  lastSuccess: string;
+  enabled: boolean;
+  /** 通道中文名 */
+  providerName: Record<string, string>;
+}
+
+export interface TranslateTestResult {
+  provider: string;
+  name: string;
+  ok: boolean;
+  error?: string;
+  elapsed?: string;
+  output?: string;
+}
+
 /* ---------- 抓取数据（数据管理，来自 Go 后端 skills 表） ---------- */
 export type DataStatus = "pending" | "approved" | "published" | "ignored";
 

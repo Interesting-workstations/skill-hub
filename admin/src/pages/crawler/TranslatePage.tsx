@@ -3,7 +3,7 @@ import AppTable, { type Column } from "../../components/AppTable";
 import AppDialog from "../../components/AppDialog";
 import { useToast } from "../../components/Toast";
 import { crawlerApi } from "../../api/crawler";
-import type { TranslationItem } from "../../types";
+import type { TranslateConfig, TranslateTestResult, TranslationItem } from "../../types";
 
 export default function TranslatePage() {
   const toast = useToast();
@@ -14,6 +14,12 @@ export default function TranslatePage() {
   const [page, setPage] = useState(1);
   const [preview, setPreview] = useState<TranslationItem | null>(null);
 
+  // 翻译通道设置
+  const [cfg, setCfg] = useState<TranslateConfig | null>(null);
+  const [primary, setPrimary] = useState("auto");
+  const [testing, setTesting] = useState(false);
+  const [testResults, setTestResults] = useState<TranslateTestResult[] | null>(null);
+
   const load = async () => {
     setLoading(true);
     try {
@@ -21,6 +27,9 @@ export default function TranslatePage() {
       // 后端可能返回 null（无数据），兜底为空数组避免渲染报错
       setItems(res.items ?? []);
       setTotal(res.total ?? 0);
+      const cfgRes = await crawlerApi.getTranslateConfig();
+      setCfg(cfgRes);
+      setPrimary(cfgRes.primary || "auto");
     } finally {
       setLoading(false);
     }
@@ -54,6 +63,39 @@ export default function TranslatePage() {
     } finally {
       setTranslating(false);
     }
+  };
+
+  // 保存主翻译通道
+  const handleSaveProvider = async () => {
+    try {
+      const updated = await crawlerApi.saveTranslateConfig(primary);
+      setCfg(updated);
+      toast.success("翻译通道已更新，立即生效");
+    } catch {
+      // 全局 Toast 已提示
+    }
+  };
+
+  // 测试翻译通道
+  const handleTest = async () => {
+    setTesting(true);
+    setTestResults(null);
+    try {
+      const res = await crawlerApi.testTranslateProvider("all");
+      setTestResults(res.results ?? []);
+    } catch {
+      // 全局 Toast 已提示
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const providerLabel = (p: string) => cfg?.providerName?.[p] ?? p;
+  const providerDesc: Record<string, string> = {
+    tencent: "腾讯云机器翻译（每月免费额度）",
+    baidu: "百度通用翻译（免费额度）",
+    google: "Google 免费接口（国内服务器可能不通）",
+    deepl: "DeepL（需 Key）",
   };
 
   const columns: Column<TranslationItem>[] = [
@@ -156,6 +198,83 @@ export default function TranslatePage() {
           <button className="btn btn-primary" onClick={handleTranslateAll} disabled={translating || total === 0}>
             {translating ? "翻译中…" : "⚡ 全部翻译"}
           </button>
+        </div>
+      </div>
+
+      {/* 翻译通道设置：选择主通道 + 一键测试连通性（哪个能用用哪个） */}
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+          <div style={{ fontWeight: 600, fontSize: 14 }}>翻译通道</div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <span style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>
+              当前链路：
+              {(cfg?.providers ?? []).map((p, i) => (
+                <span key={p}>
+                  {i > 0 && <span style={{ margin: "0 4px", color: "var(--color-text-tertiary)" }}>→</span>}
+                  <span className="badge badge-info" style={{ marginLeft: 2 }}>{providerLabel(p)}</span>
+                </span>
+              ))}
+              {cfg?.lastSuccess && (
+                <span style={{ marginLeft: 8 }}>最近成功：<b>{providerLabel(cfg.lastSuccess)}</b></span>
+              )}
+            </span>
+            <button className="btn" onClick={handleTest} disabled={testing}>
+              {testing ? "测试中…" : "🔍 测试全部通道"}
+            </button>
+          </div>
+        </div>
+
+        {/* 测试结果 */}
+        {testResults && testResults.length > 0 && (
+          <div style={{ marginBottom: 12, display: "flex", flexDirection: "column", gap: 6 }}>
+            {testResults.map((r) => (
+              <div key={r.provider} style={{ fontSize: 13, display: "flex", alignItems: "baseline", gap: 8 }}>
+                <span className={`badge ${r.ok ? "badge-success" : "badge-danger"}`}>
+                  {r.ok ? "✓ 可用" : "✗ 失败"}
+                </span>
+                <b>{r.name}</b>
+                {r.ok ? (
+                  <span style={{ color: "var(--color-text-secondary)" }}>
+                    {r.output} <span style={{ color: "var(--color-text-tertiary)" }}>（{r.elapsed}）</span>
+                  </span>
+                ) : (
+                  <span style={{ color: "var(--color-danger)" }}>{r.error}</span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* 主通道选择 */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>主通道：</span>
+          {(["auto", "tencent", "baidu", "google", "deepl"] as const).map((p) => {
+            const active = primary === p;
+            const configured = cfg?.configured?.[p];
+            return (
+              <button
+                key={p}
+                className={active ? "btn btn-primary" : "btn"}
+                style={{ fontSize: 13 }}
+                onClick={() => setPrimary(p)}
+                title={providerDesc[p]}
+              >
+                {p === "auto" ? "自动" : providerLabel(p)}
+                {p !== "auto" && (
+                  <span style={{ marginLeft: 4, opacity: 0.8 }}>
+                    {configured ? "·已配置" : "·未配置"}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+          <button className="btn-link" onClick={handleSaveProvider} disabled={!cfg}>
+            保存并生效
+          </button>
+        </div>
+        <div style={{ marginTop: 8, fontSize: 12, color: "var(--color-text-tertiary)", lineHeight: 1.6 }}>
+          自动：按 腾讯云 → 百度 → Google → DeepL 依次尝试，哪个能走通用哪个；选具体通道时优先用它，失败自动降级后续通道。
+          密钥通过服务端环境变量配置（TX_SECRETID / TX_SECRETKEY / BAIDU_APPID / BAIDU_KEY / DEEPL_KEY）。
         </div>
       </div>
 

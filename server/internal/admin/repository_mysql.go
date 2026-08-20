@@ -91,6 +91,10 @@ type Repository interface {
 	CountUntranslatedSkills() (int, error)
 	UpdateSkillTranslation(id, nameZh, descZh string) error
 
+	// 翻译配置：主翻译通道（'' = 用环境变量默认）
+	GetTranslateProvider() (string, error)
+	SaveTranslateProvider(provider string) error
+
 	ListArticles() ([]domain.Article, error)
 	GetArticle(id string) (domain.Article, error)
 	CreateArticle(a *domain.Article) error
@@ -333,6 +337,11 @@ func (r *mysqlRepo) migrate() error {
 			sort_order INT NOT NULL DEFAULT 0,
 			enabled TINYINT(1) NOT NULL DEFAULT 1,
 			created_at VARCHAR(16) NOT NULL DEFAULT ''
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+		`CREATE TABLE IF NOT EXISTS translate_config (
+			id TINYINT PRIMARY KEY,
+			provider VARCHAR(32) NOT NULL DEFAULT '',
+			updated_at VARCHAR(32) NOT NULL DEFAULT ''
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 		`CREATE TABLE IF NOT EXISTS github_tokens (
 			id VARCHAR(64) PRIMARY KEY,
@@ -1044,6 +1053,25 @@ func (r *mysqlRepo) CountUntranslatedSkills() (int, error) {
 // UpdateSkillTranslation 保存技能的中文标题与描述翻译结果。
 func (r *mysqlRepo) UpdateSkillTranslation(id, nameZh, descZh string) error {
 	_, err := r.db.Exec(`UPDATE skills SET name_zh = ?, description_zh = ? WHERE id = ?`, nameZh, descZh, id)
+	return err
+}
+
+// GetTranslateProvider 读取后台配置的主翻译通道（'' 表示用环境变量默认）。
+func (r *mysqlRepo) GetTranslateProvider() (string, error) {
+	var p string
+	err := r.db.QueryRow(`SELECT provider FROM translate_config WHERE id = 1`).Scan(&p)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	return p, err
+}
+
+// SaveTranslateProvider 保存主翻译通道（upsert 单行）。
+func (r *mysqlRepo) SaveTranslateProvider(provider string) error {
+	_, err := r.db.Exec(
+		`INSERT INTO translate_config (id, provider, updated_at) VALUES (1, ?, ?)
+		 ON DUPLICATE KEY UPDATE provider = VALUES(provider), updated_at = VALUES(updated_at)`,
+		provider, time.Now().Format("2006-01-02 15:04:05"))
 	return err
 }
 
