@@ -202,7 +202,7 @@ export default function TranslatePage() {
       </div>
 
       {/* 翻译通道设置：选择主通道 + 一键测试连通性（哪个能用用哪个） */}
-      <div className="card" style={{ marginBottom: 16 }}>
+      <div className="card card-pad" style={{ marginBottom: 16 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
           <div style={{ fontWeight: 600, fontSize: 14 }}>翻译通道</div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>

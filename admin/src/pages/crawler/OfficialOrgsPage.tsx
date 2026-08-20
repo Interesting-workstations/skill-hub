@@ -243,7 +243,7 @@ export default function OfficialOrgsPage() {
 
       {/* 重新拉取图片结果 */}
       {refreshResults && refreshResults.length > 0 && (
-        <div className="card" style={{ marginBottom: 16 }}>
+        <div className="card card-pad" style={{ marginBottom: 16 }}>
           <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 10 }}>
             图片拉取结果
             <span style={{ fontSize: 12, color: "var(--color-text-secondary)", marginLeft: 8 }}>
