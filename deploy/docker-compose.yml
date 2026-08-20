@@ -70,7 +70,12 @@ services:
     environment:
       TZ: Asia/Shanghai
     ports:
+      - "80:80"
       - "${WEB_PORT:-8080}:80"
+    volumes:
+      # ACME 域名验证 webroot + HTTPS 证书（占位自签名，备案通过后换正式证书）
+      - ./ssl/webroot:/usr/share/nginx/html/.well-known/acme-challenge
+      - ./ssl/certs:/etc/nginx/ssl
     networks: [skillhub-net]
 
   admin:
