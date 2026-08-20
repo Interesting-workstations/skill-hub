@@ -51,6 +51,18 @@ server {
         proxy_send_timeout 3600s;
     }
 
+    # 公开图片代理：组织 logo 本地缓存 / 官网图片代理（无需 secret，官网同样使用）
+    location ~ ^/api/v1/(org-logo|img-proxy) {
+        proxy_pass http://server:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 60s;
+        proxy_send_timeout 60s;
+    }
+
     # 其余路径一律 404（隐藏后台入口，避免被扫描器发现）
     location / {
         return 404;
